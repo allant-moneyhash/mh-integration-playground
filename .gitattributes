@@ -1,0 +1,6 @@
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ico binary
+# Apple Pay domain verification file: must be served byte-for-byte as Apple issued it.
+public/.well-known/apple-developer-merchantid-domain-association* binary

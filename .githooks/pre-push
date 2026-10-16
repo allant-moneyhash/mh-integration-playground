@@ -1,0 +1,3 @@
+#!/bin/sh
+# Block the push if the secret scan finds anything.
+node scripts/secret-scan.mjs || exit 1
