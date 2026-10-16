@@ -5,7 +5,11 @@ import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { ShoppingBag, Minus, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/overlays';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/overlays';
 import { cartLines, cartTotal, useCart } from '@/store/cart';
 import { formatMoney } from '@/lib/catalog';
 import { useHydrated } from '@/lib/use-hydrated';
@@ -34,7 +38,9 @@ export function CartPopover() {
       </PopoverTrigger>
       <PopoverContent align="end" className="w-96 max-w-[calc(100vw-2rem)] p-0">
         {lines.length === 0 ? (
-          <p className="p-6 text-center text-sm text-subtle">Your bag is empty.</p>
+          <p className="p-6 text-center text-sm text-subtle">
+            Your bag is empty.
+          </p>
         ) : (
           <>
             <ul className="max-h-96 divide-y overflow-y-auto">
@@ -50,20 +56,39 @@ export function CartPopover() {
                   <div className="flex flex-1 flex-col gap-1">
                     <div className="flex justify-between text-sm font-medium">
                       <span>{product.name}</span>
-                      <span>{formatMoney(product.price[currency] * quantity, currency)}</span>
+                      <span>
+                        {formatMoney(
+                          product.price[currency] * quantity,
+                          currency,
+                        )}
+                      </span>
                     </div>
                     <p className="text-xs text-subtle">{product.color}</p>
                     <div className="mt-auto flex items-center justify-between">
                       <div className="flex items-center rounded-md border">
-                        <button className="p-1.5" aria-label="Decrease" onClick={() => setQuantity(product.id, quantity - 1)}>
+                        <button
+                          className="p-1.5"
+                          aria-label="Decrease"
+                          onClick={() => setQuantity(product.id, quantity - 1)}
+                        >
                           <Minus className="size-3" />
                         </button>
-                        <span className="w-6 text-center text-sm tabular-nums">{quantity}</span>
-                        <button className="p-1.5" aria-label="Increase" onClick={() => setQuantity(product.id, quantity + 1)}>
+                        <span className="w-6 text-center text-sm tabular-nums">
+                          {quantity}
+                        </span>
+                        <button
+                          className="p-1.5"
+                          aria-label="Increase"
+                          onClick={() => setQuantity(product.id, quantity + 1)}
+                        >
                           <Plus className="size-3" />
                         </button>
                       </div>
-                      <Button variant="ghost" size="sm" onClick={() => remove(product.id)}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => remove(product.id)}
+                      >
                         Remove
                       </Button>
                     </div>

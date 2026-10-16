@@ -1,6 +1,12 @@
 // Server-only MoneyHash client. Secret keys are read here and nowhere else.
 import { createHash, randomUUID } from 'node:crypto';
-import { ENVIRONMENTS, isApiVersion, isEnvId, type ApiVersion, type EnvId } from '@/lib/hosts';
+import {
+  ENVIRONMENTS,
+  isApiVersion,
+  isEnvId,
+  type ApiVersion,
+  type EnvId,
+} from '@/lib/hosts';
 import { maskDeep } from '@/lib/mask';
 import type { ConsoleEntry } from '@/lib/console-types';
 
@@ -18,7 +24,8 @@ export type Target = { env: EnvId; version: ApiVersion };
 
 export function parseTarget(env: unknown, version: unknown): Target {
   if (!isEnvId(env)) throw new RequestError(400, 'Unknown environment.');
-  if (!isApiVersion(version)) throw new RequestError(400, 'Unsupported API version.');
+  if (!isApiVersion(version))
+    throw new RequestError(400, 'Unsupported API version.');
   return { env, version };
 }
 
@@ -45,13 +52,15 @@ export function resolveApiKey(req: Request, env: EnvId): string {
 // `is_live`. Creating an intent moves no money, so we create, check, and close
 // straight away if it is live. Keys seen as live are refused from then on.
 const liveKeyFingerprints = new Set<string>();
-const fingerprint = (key: string) => createHash('sha256').update(key).digest('hex');
+const fingerprint = (key: string) =>
+  createHash('sha256').update(key).digest('hex');
 
 export const LIVE_KEY_MESSAGE =
   'Live-mode keys are switched off on this deployment (MH_BLOCK_LIVE_KEYS). The intent was closed. Use a test-mode key.';
 
 export function assertNotKnownLive(key: string) {
-  if (!liveAllowed() && liveKeyFingerprints.has(fingerprint(key))) throw new RequestError(403, LIVE_KEY_MESSAGE);
+  if (!liveAllowed() && liveKeyFingerprints.has(fingerprint(key)))
+    throw new RequestError(403, LIVE_KEY_MESSAGE);
 }
 
 /**
@@ -63,7 +72,8 @@ export function liveAllowed() {
 }
 
 /** Shown on the create-intent console entry when MoneyHash reports a live intent. */
-export const LIVE_NOTE = 'LIVE MODE: is_live is true, so this intent can move real money.';
+export const LIVE_NOTE =
+  'LIVE MODE: is_live is true, so this intent can move real money.';
 
 export function isLiveResponse(data: unknown): boolean {
   const d = (data as { data?: Record<string, unknown> })?.data;
@@ -89,11 +99,28 @@ type CallInput = {
   url?: string;
 };
 
-export type CallResult = { entry: ConsoleEntry; data: unknown; ok: boolean; status: number };
+export type CallResult = {
+  entry: ConsoleEntry;
+  data: unknown;
+  ok: boolean;
+  status: number;
+};
 
-export async function mhCall({ target, apiKey, method, path, body, title, url: absolute }: CallInput): Promise<CallResult> {
-  const url = absolute ?? `${ENVIRONMENTS[target.env].api}/api/${target.version}${path}`;
-  const headers: Record<string, string> = { 'x-api-key': apiKey, accept: 'application/json' };
+export async function mhCall({
+  target,
+  apiKey,
+  method,
+  path,
+  body,
+  title,
+  url: absolute,
+}: CallInput): Promise<CallResult> {
+  const url =
+    absolute ?? `${ENVIRONMENTS[target.env].api}/api/${target.version}${path}`;
+  const headers: Record<string, string> = {
+    'x-api-key': apiKey,
+    accept: 'application/json',
+  };
   if (body !== undefined) headers['content-type'] = 'application/json';
   if (method !== 'GET') headers['x-idempotency-key'] = randomUUID();
 
@@ -116,7 +143,12 @@ export async function mhCall({ target, apiKey, method, path, body, title, url: a
       data = { raw: text.slice(0, 2000) };
     }
   } catch (err) {
-    data = { error: err instanceof Error && err.name === 'TimeoutError' ? 'MoneyHash did not answer within 20s' : 'Could not reach MoneyHash' };
+    data = {
+      error:
+        err instanceof Error && err.name === 'TimeoutError'
+          ? 'MoneyHash did not answer within 20s'
+          : 'Could not reach MoneyHash',
+    };
   }
   const latencyMs = Math.round(performance.now() - started);
   const ok = status >= 200 && status < 300;
@@ -140,9 +172,18 @@ export async function mhCall({ target, apiKey, method, path, body, title, url: a
 
 export function errorResponse(err: unknown) {
   if (err instanceof RequestError) {
-    return Response.json({ error: err.message, entries: err.entries }, { status: err.status });
+    return Response.json(
+      { error: err.message, entries: err.entries },
+      { status: err.status },
+    );
   }
   // Never echo raw errors: they could carry request details.
-  console.error('Unexpected server error', err instanceof Error ? err.name : 'unknown');
-  return Response.json({ error: 'Something went wrong on the playground server.' }, { status: 500 });
+  console.error(
+    'Unexpected server error',
+    err instanceof Error ? err.name : 'unknown',
+  );
+  return Response.json(
+    { error: 'Something went wrong on the playground server.' },
+    { status: 500 },
+  );
 }

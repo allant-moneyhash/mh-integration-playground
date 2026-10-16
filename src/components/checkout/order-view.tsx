@@ -43,8 +43,10 @@ export function OrderView() {
     }
   }, []);
 
-  if (!hydrated) return <div className="mx-auto h-96 max-w-7xl animate-pulse px-4" />;
-  if (window.top !== window.self) return <p className="p-6 text-sm text-subtle">Returning to the store…</p>;
+  if (!hydrated)
+    return <div className="mx-auto h-96 max-w-7xl animate-pulse px-4" />;
+  if (window.top !== window.self)
+    return <p className="p-6 text-sm text-subtle">Returning to the store…</p>;
   return <Order intentId={intentId} />;
 }
 
@@ -62,7 +64,10 @@ function Order({ intentId }: { intentId: string | null }) {
     order && order.outcome !== 'pending'
       ? { summary: order.summary, via: `the ${order.event} webhook` }
       : fallback && fallback.outcome !== 'pending'
-        ? { summary: fallback, via: 'GET /payments/intent/{id}/ (no final webhook yet)' }
+        ? {
+            summary: fallback,
+            via: 'GET /payments/intent/{id}/ (no final webhook yet)',
+          }
         : null;
 
   const isDecided = decided !== null;
@@ -87,17 +92,30 @@ function Order({ intentId }: { intentId: string | null }) {
       if (stopped) return;
       let entries: ConsoleEntry[] = [];
       try {
-        const res = await getPaymentIntent(session, intentId!, { log: false, onEntries: e => (entries = e) });
+        const res = await getPaymentIntent(session, intentId!, {
+          log: false,
+          onEntries: e => (entries = e),
+        });
         if (stopped) return;
         const s = summariseIntent(res.data);
         if (s.outcome !== 'pending') {
-          useConsole.getState().add(...entries.map(e => ({ ...e, title: 'Fallback: get payment intent (no final webhook yet)' })));
+          useConsole.getState().add(
+            ...entries.map(e => ({
+              ...e,
+              title: 'Fallback: get payment intent (no final webhook yet)',
+            })),
+          );
           setFallback(s);
           return;
         }
         // No transaction at all: the customer left before paying, so no webhook will come.
         if (!s.transactionId) {
-          useConsole.getState().add(...entries.map(e => ({ ...e, title: 'Fallback: get payment intent (no payment attempted)' })));
+          useConsole.getState().add(
+            ...entries.map(e => ({
+              ...e,
+              title: 'Fallback: get payment intent (no payment attempted)',
+            })),
+          );
           setNoPayment(true);
           return;
         }
@@ -116,16 +134,26 @@ function Order({ intentId }: { intentId: string | null }) {
 
   // Paid, or placed with payment pending (Cash on Delivery…): the cart is done.
   useEffect(() => {
-    if (decided?.summary.outcome === 'success' || decided?.summary.outcome === 'action') clearCart();
+    if (
+      decided?.summary.outcome === 'success' ||
+      decided?.summary.outcome === 'action'
+    )
+      clearCart();
   }, [decided?.summary.outcome, clearCart]);
 
   return (
     <WithConsole narrow>
       <WebhookWatcher intentId={intentId} />
       <div className="py-8 sm:py-12">
-        {!intentId && <p className="text-subtle">No intent_id in the URL, so there is nothing to look up.</p>}
+        {!intentId && (
+          <p className="text-subtle">
+            No intent_id in the URL, so there is nothing to look up.
+          </p>
+        )}
         {intentId && !decided && (noPayment ? <NoPayment /> : <Waiting />)}
-        {error && !decided && <p className="mt-4 text-sm text-destructive">{error}</p>}
+        {error && !decided && (
+          <p className="mt-4 text-sm text-destructive">{error}</p>
+        )}
         {decided && <Result decided={decided} intentId={intentId!} />}
       </div>
     </WithConsole>
@@ -138,8 +166,13 @@ function Waiting() {
       <h1 className="flex items-center gap-2 text-base font-medium text-primary">
         <Loader2 className="size-4 animate-spin" /> Confirming your payment
       </h1>
-      <p className="mt-2 text-4xl font-bold tracking-tight text-bolder sm:text-5xl">One moment…</p>
-      <p className="mt-2 text-base text-subtle">Waiting for MoneyHash&apos;s webhook to reach the store. This page updates by itself.</p>
+      <p className="mt-2 text-4xl font-bold tracking-tight text-bolder sm:text-5xl">
+        One moment…
+      </p>
+      <p className="mt-2 text-base text-subtle">
+        Waiting for MoneyHash&apos;s webhook to reach the store. This page
+        updates by itself.
+      </p>
     </div>
   );
 }
@@ -147,10 +180,15 @@ function Waiting() {
 function NoPayment() {
   return (
     <div className="max-w-xl">
-      <h1 className="text-base font-medium text-destructive">No payment was made</h1>
-      <p className="mt-2 text-4xl font-bold tracking-tight text-bolder sm:text-5xl">Your order isn&apos;t placed yet</p>
+      <h1 className="text-base font-medium text-destructive">
+        No payment was made
+      </h1>
+      <p className="mt-2 text-4xl font-bold tracking-tight text-bolder sm:text-5xl">
+        Your order isn&apos;t placed yet
+      </p>
       <p className="mt-2 text-base text-subtle">
-        MoneyHash has no transaction for this intent, so the checkout was left before paying. Your cart is still there.
+        MoneyHash has no transaction for this intent, so the checkout was left
+        before paying. Your cart is still there.
       </p>
       <div className="mt-8 flex gap-2">
         <Button asChild>
@@ -175,27 +213,59 @@ const PAYMENT_STATUS_LABEL: Record<string, string> = {
   ABORTED: 'Aborted',
 };
 
-const titleCase = (s: string) => s.replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+const titleCase = (s: string) =>
+  s.replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
 /** The highlighted payment details: what the webhook told the store. */
-function PaymentSummary({ summary, intentId, via, total }: { summary: IntentSummary; intentId: string; via: string; total?: string }) {
+function PaymentSummary({
+  summary,
+  intentId,
+  via,
+  total,
+}: {
+  summary: IntentSummary;
+  intentId: string;
+  via: string;
+  total?: string;
+}) {
   const ok = summary.outcome === 'success';
   const pending = summary.outcome === 'action';
-  const badge = pending ? 'Payment pending' : (PAYMENT_STATUS_LABEL[summary.paymentStatus ?? ''] ?? (ok ? 'Paid' : 'Failed'));
-  const method = [summary.paymentMethod && titleCase(summary.paymentMethod.toLowerCase()), summary.card].filter(Boolean).join(' · ');
+  const badge = pending
+    ? 'Payment pending'
+    : (PAYMENT_STATUS_LABEL[summary.paymentStatus ?? ''] ??
+      (ok ? 'Paid' : 'Failed'));
+  const method = [
+    summary.paymentMethod && titleCase(summary.paymentMethod.toLowerCase()),
+    summary.card,
+  ]
+    .filter(Boolean)
+    .join(' · ');
   const rows: [string, React.ReactNode][] = [
     ['Amount', summary.amount ?? total ?? '–'],
     ['Payment method', method || '–'],
-    ...(summary.provider ? [['Processed by', summary.provider] as [string, React.ReactNode]] : []),
+    ...(summary.provider
+      ? [['Processed by', summary.provider] as [string, React.ReactNode]]
+      : []),
     ['Transaction ID', <Copyable key="tx" value={summary.transactionId} />],
     ['Intent ID', <Copyable key="intent" value={intentId} />],
-    ['MoneyHash status', (pending ? summary.transactionStatus : undefined) ?? summary.paymentStatus ?? summary.transactionStatus ?? summary.intentStatus ?? '–'],
+    [
+      'MoneyHash status',
+      (pending ? summary.transactionStatus : undefined) ??
+        summary.paymentStatus ??
+        summary.transactionStatus ??
+        summary.intentStatus ??
+        '–',
+    ],
   ];
   return (
     <section
       className={cn(
         'mt-10 overflow-hidden rounded-lg border',
-        ok ? 'border-green-600/30 bg-green-500/5' : pending ? 'border-amber-500/40 bg-amber-500/5' : 'border-destructive/30 bg-destructive/5',
+        ok
+          ? 'border-green-600/30 bg-green-500/5'
+          : pending
+            ? 'border-amber-500/40 bg-amber-500/5'
+            : 'border-destructive/30 bg-destructive/5',
       )}
     >
       <div className="flex items-center justify-between border-b border-inherit px-5 py-3">
@@ -203,7 +273,11 @@ function PaymentSummary({ summary, intentId, via, total }: { summary: IntentSumm
         <span
           className={cn(
             'rounded-full px-2.5 py-0.5 text-xs font-semibold',
-            ok ? 'bg-green-600 text-white' : pending ? 'bg-amber-500 text-white' : 'bg-destructive text-white',
+            ok
+              ? 'bg-green-600 text-white'
+              : pending
+                ? 'bg-amber-500 text-white'
+                : 'bg-destructive text-white',
           )}
         >
           {badge}
@@ -219,7 +293,9 @@ function PaymentSummary({ summary, intentId, via, total }: { summary: IntentSumm
       </dl>
       {pending && !!summary.actionMessages?.length && (
         <div className="border-t border-inherit px-5 py-4 text-sm">
-          <h3 className="font-medium text-bolder">How to complete the payment</h3>
+          <h3 className="font-medium text-bolder">
+            How to complete the payment
+          </h3>
           <ul className="mt-2 list-disc space-y-1 ps-5 text-subtle">
             {summary.actionMessages.map((m, i) => (
               <li key={i} className="text-bolder">
@@ -228,13 +304,16 @@ function PaymentSummary({ summary, intentId, via, total }: { summary: IntentSumm
             ))}
           </ul>
           <p className="mt-2 text-xs text-subtle">
-            Use this reference to pay with {summary.provider ?? 'the provider'} (for Sadad: in your bank&apos;s app or online banking, under Sadad bill
-            payments). The order updates once the provider confirms the payment.
+            Use this reference to pay with {summary.provider ?? 'the provider'}{' '}
+            (for Sadad: in your bank&apos;s app or online banking, under Sadad
+            bill payments). The order updates once the provider confirms the
+            payment.
           </p>
         </div>
       )}
       <p className="border-t border-inherit px-5 py-2 text-xs text-subtle">
-        {pending ? 'Order placed per' : 'Confirmed by'} {via}.{pending && ' This page updates when the payment is completed.'}
+        {pending ? 'Order placed per' : 'Confirmed by'} {via}.
+        {pending && ' This page updates when the payment is completed.'}
       </p>
     </section>
   );
@@ -247,7 +326,13 @@ function Linkified({ text }: { text: string }) {
     <>
       {parts.map((p, i) =>
         /^https?:\/\//.test(p) ? (
-          <a key={i} href={p} target="_blank" rel="noopener noreferrer" className="break-all text-primary underline">
+          <a
+            key={i}
+            href={p}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="break-all text-primary underline"
+          >
             {p}
           </a>
         ) : (
@@ -283,28 +368,57 @@ function Result({ decided, intentId }: { decided: Decided; intentId: string }) {
   return (
     <div>
       <div className="max-w-xl">
-        <h1 className={cn('flex items-center gap-2 text-base font-medium', ok || pending ? 'text-primary' : 'text-destructive')}>
-          {ok ? 'Thank you!' : pending ? 'Order placed · payment pending' : 'Payment failed'}
-          {summary.isLive && <span className="rounded bg-destructive px-1.5 py-0.5 text-[10px] text-white">LIVE</span>}
+        <h1
+          className={cn(
+            'flex items-center gap-2 text-base font-medium',
+            ok || pending ? 'text-primary' : 'text-destructive',
+          )}
+        >
+          {ok
+            ? 'Thank you!'
+            : pending
+              ? 'Order placed · payment pending'
+              : 'Payment failed'}
+          {summary.isLive && (
+            <span className="rounded bg-destructive px-1.5 py-0.5 text-[10px] text-white">
+              LIVE
+            </span>
+          )}
         </h1>
         <p className="mt-2 text-4xl font-bold tracking-tight text-bolder sm:text-5xl">
-          {ok ? "It's on the way!" : pending ? 'Almost there!' : 'We couldn’t take your payment'}
+          {ok
+            ? "It's on the way!"
+            : pending
+              ? 'Almost there!'
+              : 'We couldn’t take your payment'}
         </p>
         <p className="mt-2 text-base text-subtle">
           {ok
             ? 'Your payment is confirmed and your order will ship soon.'
             : pending
               ? 'Your order is placed. Complete the payment as described below; we’ll confirm it once the provider tells us.'
-              : summary.responseMessage ?? 'Please try again or choose another payment method.'}
+              : (summary.responseMessage ??
+                'Please try again or choose another payment method.')}
         </p>
       </div>
 
-      <PaymentSummary summary={summary} intentId={intentId} via={via} total={order ? formatMoney(order.total, order.currency) : undefined} />
+      <PaymentSummary
+        summary={summary}
+        intentId={intentId}
+        via={via}
+        total={order ? formatMoney(order.total, order.currency) : undefined}
+      />
 
       <div className="mt-10 border-t">
         {order?.items.map(item => (
           <div key={item.id} className="flex gap-6 border-b py-8">
-            <Image src={item.imageSrc} alt={item.imageAlt} width={160} height={160} className="h-20 w-20 flex-none rounded-lg object-cover sm:h-32 sm:w-32" />
+            <Image
+              src={item.imageSrc}
+              alt={item.imageAlt}
+              width={160}
+              height={160}
+              className="h-20 w-20 flex-none rounded-lg object-cover sm:h-32 sm:w-32"
+            />
             <div className="flex flex-auto flex-col">
               <h4 className="font-medium">{item.name}</h4>
               <p className="mt-1 text-sm text-subtle">{item.color}</p>
@@ -315,7 +429,9 @@ function Result({ decided, intentId }: { decided: Decided; intentId: string }) {
                 </div>
                 <div className="flex ps-4">
                   <dt className="font-medium text-subtler">Price</dt>
-                  <dd className="ms-2 text-bolder">{formatMoney(item.lineTotal, order.currency)}</dd>
+                  <dd className="ms-2 text-bolder">
+                    {formatMoney(item.lineTotal, order.currency)}
+                  </dd>
                 </div>
               </dl>
             </div>
@@ -349,7 +465,9 @@ function Result({ decided, intentId }: { decided: Decided; intentId: string }) {
           {order && (
             <dl className="flex justify-between border-t pt-8 text-sm">
               <dt className="font-medium text-bolder">Total</dt>
-              <dd className="font-medium">{formatMoney(order.total, order.currency)}</dd>
+              <dd className="font-medium">
+                {formatMoney(order.total, order.currency)}
+              </dd>
             </dl>
           )}
           <div className="mt-10 flex gap-2">

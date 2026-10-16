@@ -1,9 +1,20 @@
 'use client';
 import Link from 'next/link';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { CURRENCIES, type Currency } from '@/lib/catalog';
-import { API_VERSIONS, ENV_IDS, type ApiVersion, type EnvId } from '@/lib/hosts';
+import {
+  API_VERSIONS,
+  ENV_IDS,
+  type ApiVersion,
+  type EnvId,
+} from '@/lib/hosts';
 import { useCart } from '@/store/cart';
 import { useConfig } from '@/store/config';
 import { useHydrated } from '@/lib/use-hydrated';
@@ -25,7 +36,10 @@ export function Navbar() {
           {hydrated && (
             <>
               <Setting label="Environment">
-                <Select value={cfg.env} onValueChange={v => cfg.set({ env: v as EnvId })}>
+                <Select
+                  value={cfg.env}
+                  onValueChange={v => cfg.set({ env: v as EnvId })}
+                >
                   <SelectTrigger className="h-7 w-32 bg-background text-xs">
                     <SelectValue />
                   </SelectTrigger>
@@ -39,7 +53,10 @@ export function Navbar() {
                 </Select>
               </Setting>
               <Setting label="API">
-                <Select value={cfg.apiVersion} onValueChange={v => cfg.set({ apiVersion: v as ApiVersion })}>
+                <Select
+                  value={cfg.apiVersion}
+                  onValueChange={v => cfg.set({ apiVersion: v as ApiVersion })}
+                >
                   <SelectTrigger className="h-7 w-20 bg-background text-xs">
                     <SelectValue />
                   </SelectTrigger>
@@ -53,10 +70,19 @@ export function Navbar() {
                 </Select>
               </Setting>
               <Setting label="Intent secret">
-                <Switch checked={cfg.useIntentSecret} onCheckedChange={v => cfg.set({ useIntentSecret: v })} aria-label="Use intent secret" />
+                <Switch
+                  checked={cfg.useIntentSecret}
+                  onCheckedChange={v => cfg.set({ useIntentSecret: v })}
+                  aria-label="Use intent secret"
+                />
               </Setting>
               <Setting label="Card form">
-                <Select value={cfg.cardFormLayout} onValueChange={v => cfg.set({ cardFormLayout: v as 'compact' | 'expanded' })}>
+                <Select
+                  value={cfg.cardFormLayout}
+                  onValueChange={v =>
+                    cfg.set({ cardFormLayout: v as 'compact' | 'expanded' })
+                  }
+                >
                   <SelectTrigger className="h-7 w-28 bg-background text-xs">
                     <SelectValue />
                   </SelectTrigger>
@@ -67,7 +93,11 @@ export function Navbar() {
                 </Select>
               </Setting>
               <Setting label="Console">
-                <Switch checked={cfg.showConsole} onCheckedChange={v => cfg.set({ showConsole: v })} aria-label="Show console" />
+                <Switch
+                  checked={cfg.showConsole}
+                  onCheckedChange={v => cfg.set({ showConsole: v })}
+                  aria-label="Show console"
+                />
               </Setting>
             </>
           )}
@@ -78,10 +108,15 @@ export function Navbar() {
         <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6 lg:px-8">
           <Link href="/" className="flex items-center gap-2">
             <MoneyHashLogo />
-            <span className="hidden text-lg font-semibold sm:inline">Integration Playground</span>
+            <span className="hidden text-lg font-semibold sm:inline">
+              Integration Playground
+            </span>
           </Link>
           <div className="ms-auto flex items-center gap-2">
-            <Select value={hydrated ? currency : 'AED'} onValueChange={v => setCurrency(v as Currency)}>
+            <Select
+              value={hydrated ? currency : 'AED'}
+              onValueChange={v => setCurrency(v as Currency)}
+            >
               <SelectTrigger className="w-24" aria-label="Currency">
                 <SelectValue />
               </SelectTrigger>
@@ -102,7 +137,13 @@ export function Navbar() {
   );
 }
 
-function Setting({ label, children }: { label: string; children: React.ReactNode }) {
+function Setting({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <label className="flex shrink-0 items-center gap-2 border-e pe-4">
       <span className="text-subtler">{label}</span>

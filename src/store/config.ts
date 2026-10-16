@@ -3,7 +3,12 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { DEFAULT_API_VERSION, type ApiVersion, type EnvId } from '@/lib/hosts';
 import type { IntentPatch } from '@/lib/intent-body';
-import { DEFAULT_SELECTION, fromLegacyFlowId, normalise, type Selection } from '@/flows/selection';
+import {
+  DEFAULT_SELECTION,
+  fromLegacyFlowId,
+  normalise,
+  type Selection,
+} from '@/flows/selection';
 
 export type Customer = {
   first_name: string;
@@ -91,7 +96,10 @@ export const useConfig = create<ConfigState>()(
           delete patchSet[key];
           return {
             embedOptions: { ...s.embedOptions, [key]: value },
-            intentPatch: { set: patchSet, removed: s.intentPatch.removed.filter(k => k !== key) },
+            intentPatch: {
+              set: patchSet,
+              removed: s.intentPatch.removed.filter(k => k !== key),
+            },
           };
         }),
     }),
@@ -103,9 +111,19 @@ export const useConfig = create<ConfigState>()(
         const old = (persisted ?? {}) as Record<string, unknown>;
         if (version < 2) {
           const { flowId, ...rest } = old;
-          return { ...rest, selection: fromLegacyFlowId(typeof flowId === 'string' ? flowId : '') };
+          return {
+            ...rest,
+            selection: fromLegacyFlowId(
+              typeof flowId === 'string' ? flowId : '',
+            ),
+          };
         }
-        return { ...old, selection: normalise((old.selection as Selection) ?? DEFAULT_SELECTION) };
+        return {
+          ...old,
+          selection: normalise(
+            (old.selection as Selection) ?? DEFAULT_SELECTION,
+          ),
+        };
       },
       // Details saved by older versions miss newer fields (street, building…): fill them in.
       merge: (persisted, current) => {
@@ -114,7 +132,13 @@ export const useConfig = create<ConfigState>()(
         return {
           ...current,
           ...p,
-          customer: { ...c, street: c.street || c.address, building: c.building || '12', floor: c.floor || '1', apartment: c.apartment || '4' },
+          customer: {
+            ...c,
+            street: c.street || c.address,
+            building: c.building || '12',
+            floor: c.floor || '1',
+            apartment: c.apartment || '4',
+          },
         };
       },
       partialize: s => ({

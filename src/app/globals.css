@@ -1,5 +1,5 @@
-@import "tailwindcss";
-@import "tw-animate-css";
+@import 'tailwindcss';
+@import 'tw-animate-css';
 
 /* Dark mode is class-based (next-themes), same as shop.moneyhash.io */
 @custom-variant dark (&:is(.dark *));

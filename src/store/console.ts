@@ -34,7 +34,9 @@ type ConsoleState = {
 };
 
 const newId = () =>
-  typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : String(Math.random());
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : String(Math.random());
 
 export const useConsole = create<ConsoleState>()(
   persist(
@@ -49,39 +51,78 @@ export const useConsole = create<ConsoleState>()(
         set(s => ({
           entries: [
             ...s.entries,
-            ...entries.map(e => maskDeep({ ...e, attemptId: e.attemptId ?? s.currentAttemptId ?? undefined })),
+            ...entries.map(e =>
+              maskDeep({
+                ...e,
+                attemptId: e.attemptId ?? s.currentAttemptId ?? undefined,
+              }),
+            ),
           ].slice(-300),
         })),
       startAttempt: (label, runKey) => {
         const id = newId();
         set(s => {
-          const attempts = [...s.attempts, { id, label, startedAt: Date.now(), intentIds: [], ...(runKey ? { runKey } : {}) }].slice(-MAX_ATTEMPTS);
+          const attempts = [
+            ...s.attempts,
+            {
+              id,
+              label,
+              startedAt: Date.now(),
+              intentIds: [],
+              ...(runKey ? { runKey } : {}),
+            },
+          ].slice(-MAX_ATTEMPTS);
           const keep = new Set(attempts.map(a => a.id));
           // Drop entries of checkouts that fell out of History (and any untagged leftovers).
-          return { attempts, currentAttemptId: id, entries: s.entries.filter(e => e.attemptId && keep.has(e.attemptId)) };
+          return {
+            attempts,
+            currentAttemptId: id,
+            entries: s.entries.filter(
+              e => e.attemptId && keep.has(e.attemptId),
+            ),
+          };
         });
         return id;
       },
       linkIntent: intentId =>
         set(s => ({
-          attempts: s.attempts.map(a => (a.id === s.currentAttemptId && !a.intentIds.includes(intentId) ? { ...a, intentIds: [...a.intentIds, intentId] } : a)),
+          attempts: s.attempts.map(a =>
+            a.id === s.currentAttemptId && !a.intentIds.includes(intentId)
+              ? { ...a, intentIds: [...a.intentIds, intentId] }
+              : a,
+          ),
         })),
-      attemptForIntent: intentId => get().attempts.find(a => a.intentIds.includes(intentId))?.id,
+      attemptForIntent: intentId =>
+        get().attempts.find(a => a.intentIds.includes(intentId))?.id,
       endAttempt: () => set({ currentAttemptId: null }),
-      focusAttempt: attemptId => set(s => (s.attempts.some(a => a.id === attemptId) ? { currentAttemptId: attemptId } : {})),
+      focusAttempt: attemptId =>
+        set(s =>
+          s.attempts.some(a => a.id === attemptId)
+            ? { currentAttemptId: attemptId }
+            : {},
+        ),
       clear: () => set({ entries: [], attempts: [], currentAttemptId: null }),
-      clearEntries: attemptId => set(s => ({ entries: s.entries.filter(e => e.attemptId !== attemptId) })),
+      clearEntries: attemptId =>
+        set(s => ({
+          entries: s.entries.filter(e => e.attemptId !== attemptId),
+        })),
       removeAttempt: attemptId =>
         set(s => ({
           attempts: s.attempts.filter(a => a.id !== attemptId),
           entries: s.entries.filter(e => e.attemptId !== attemptId),
-          currentAttemptId: s.currentAttemptId === attemptId ? null : s.currentAttemptId,
+          currentAttemptId:
+            s.currentAttemptId === attemptId ? null : s.currentAttemptId,
         })),
-      setOrder: order => set(s => ({ orders: { ...s.orders, [order.intentId]: order } })),
+      setOrder: order =>
+        set(s => ({ orders: { ...s.orders, [order.intentId]: order } })),
     }),
     // Local storage: the log survives the redirect to MoneyHash and back, and History
     // survives reloads. Everything in it is already masked.
-    { name: 'mh-playground-console', storage: createJSONStorage(() => localStorage), version: 3 },
+    {
+      name: 'mh-playground-console',
+      storage: createJSONStorage(() => localStorage),
+      version: 3,
+    },
   ),
 );
 

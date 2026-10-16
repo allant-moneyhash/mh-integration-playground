@@ -26,7 +26,8 @@ export type IntentSummary = {
 };
 
 type Obj = Record<string, unknown>;
-const obj = (v: unknown): Obj | undefined => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Obj) : undefined);
+const obj = (v: unknown): Obj | undefined =>
+  v && typeof v === 'object' && !Array.isArray(v) ? (v as Obj) : undefined;
 const str = (v: unknown) => (typeof v === 'string' && v ? v : undefined);
 
 /**
@@ -56,18 +57,32 @@ export function summariseIntent(data: unknown): IntentSummary {
   const lastOp = obj(ops[ops.length - 1]);
   const latest = obj(lastOp?.latest_status);
 
-  const last4 = str(detailData?.last_4) ?? str(detailData?.last4) ?? str(detailData?.card_last_four);
-  const brand = str(detailData?.brand) ?? str(detailData?.card_brand) ?? str(detailData?.scheme);
+  const last4 =
+    str(detailData?.last_4) ??
+    str(detailData?.last4) ??
+    str(detailData?.card_last_four);
+  const brand =
+    str(detailData?.brand) ??
+    str(detailData?.card_brand) ??
+    str(detailData?.scheme);
 
   return {
-    outcome: outcomeOf({ paymentStatus, transactionStatus, intentStatus, state }),
+    outcome: outcomeOf({
+      paymentStatus,
+      transactionStatus,
+      intentStatus,
+      state,
+    }),
     intentStatus,
     paymentStatus,
     transactionStatus,
     state,
     isLive: intent.is_live === true || root.is_live === true,
     responseMessage:
-      str(tx?.response_message) ?? str(tx?.localized_response_message) ?? str(latest?.localized_message) ?? str(latest?.message),
+      str(tx?.response_message) ??
+      str(tx?.localized_response_message) ??
+      str(latest?.localized_message) ??
+      str(latest?.message),
     transactionId: str(tx?.id),
     paymentMethod:
       str(tx?.payment_method_name) ??
@@ -83,21 +98,26 @@ export function summariseIntent(data: unknown): IntentSummary {
     })(),
     amount:
       str(amount?.display_value) ??
-      (amount?.value !== undefined ? `${amount.value} ${str(amount.currency) ?? str(intent.amount_currency) ?? ''}`.trim() : undefined),
+      (amount?.value !== undefined
+        ? `${amount.value} ${str(amount.currency) ?? str(intent.amount_currency) ?? ''}`.trim()
+        : undefined),
   };
 }
 
-const label = (k: string) => k.replace(/[_-]+/g, ' ').replace(/^\w/, c => c.toUpperCase());
+const label = (k: string) =>
+  k.replace(/[_-]+/g, ' ').replace(/^\w/, c => c.toUpperCase());
 
 /** Flattens a value MoneyHash sends as instructions into readable lines. */
 function linesOf(v: unknown, prefix = '', depth = 0): string[] {
   if (depth > 4 || v === null || v === undefined || v === '') return [];
-  if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') return [prefix ? `${prefix}: ${v}` : String(v)];
+  if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean')
+    return [prefix ? `${prefix}: ${v}` : String(v)];
   if (Array.isArray(v)) return v.flatMap(x => linesOf(x, prefix, depth + 1));
   const o = v as Obj;
   // Section-like objects: { title, value } / { label, value } / { key, value }.
   const name = str(o.title) ?? str(o.label) ?? str(o.key) ?? str(o.name);
-  if (name && ('value' in o || 'text' in o)) return linesOf(o.value ?? o.text, name, depth + 1);
+  if (name && ('value' in o || 'text' in o))
+    return linesOf(o.value ?? o.text, name, depth + 1);
   return Object.entries(o).flatMap(([k, x]) => linesOf(x, label(k), depth + 1));
 }
 
@@ -115,28 +135,53 @@ function actionLines(...sources: (Obj | undefined)[]): string[] {
     // MoneyHash's own pending page shows it too.
     const ref = obj(s.provider_unique_reference);
     const refKey = str(ref?.key);
-    const refValue = str(ref?.value) ?? (typeof ref?.value === 'number' ? String(ref.value) : undefined);
+    const refValue =
+      str(ref?.value) ??
+      (typeof ref?.value === 'number' ? String(ref.value) : undefined);
     if (refKey && refValue) out.push(`${label(refKey)}: ${refValue}`);
-    for (const [k, v] of Object.entries(obj(s.provider_transaction_fields) ?? {})) {
+    for (const [k, v] of Object.entries(
+      obj(s.provider_transaction_fields) ?? {},
+    )) {
       if (k === refKey || v === null || v === '') continue;
-      for (const line of linesOf(v, label(k))) if (!out.includes(line)) out.push(line);
+      for (const line of linesOf(v, label(k)))
+        if (!out.includes(line)) out.push(line);
     }
-    for (const key of ['external_action_message', 'externalActionMessage', 'external_sections', 'externalSections']) {
-      for (const line of linesOf(s[key])) if (line.trim() && !out.includes(line)) out.push(line);
+    for (const key of [
+      'external_action_message',
+      'externalActionMessage',
+      'external_sections',
+      'externalSections',
+    ]) {
+      for (const line of linesOf(s[key]))
+        if (line.trim() && !out.includes(line)) out.push(line);
     }
   }
   return out;
 }
 
-function outcomeOf(s: { paymentStatus?: string; transactionStatus?: string; intentStatus?: string; state?: string }): Outcome {
+function outcomeOf(s: {
+  paymentStatus?: string;
+  transactionStatus?: string;
+  intentStatus?: string;
+  state?: string;
+}): Outcome {
   const ps = s.paymentStatus ?? '';
   const tx = (s.transactionStatus ?? '').toUpperCase();
-  if (['CAPTURED', 'AUTHORIZED'].includes(ps) || tx.includes('SUCCESS') || s.intentStatus === 'PROCESSED' || s.state === 'INTENT_PROCESSED') {
+  if (
+    ['CAPTURED', 'AUTHORIZED'].includes(ps) ||
+    tx.includes('SUCCESS') ||
+    s.intentStatus === 'PROCESSED' ||
+    s.state === 'INTENT_PROCESSED'
+  ) {
     return 'success';
   }
   // Offline methods (Cash on Delivery, Bank Transfer, Pay at Fawry…): the order is
   // placed and the customer pays outside the store; the final result comes later.
-  if (tx.includes('PENDING_EXTERNAL_ACTION') || tx.includes('PENDING_ONLINE_EXTERNAL_ACTION') || s.state === 'TRANSACTION_WAITING_USER_ACTION') {
+  if (
+    tx.includes('PENDING_EXTERNAL_ACTION') ||
+    tx.includes('PENDING_ONLINE_EXTERNAL_ACTION') ||
+    s.state === 'TRANSACTION_WAITING_USER_ACTION'
+  ) {
     return 'action';
   }
   if (
@@ -154,8 +199,22 @@ function outcomeOf(s: { paymentStatus?: string; transactionStatus?: string; inte
 /** What a webhook type says about the outcome, if anything. */
 export function outcomeFromWebhook(type: string): Outcome | null {
   const t = type.toLowerCase();
-  if (t === 'intent.processed' || /^transaction\.(purchase|authorize|capture)\.successful$/.test(t)) return 'success';
-  if (/^transaction\.(purchase|authorize)\.failed$/.test(t) || t === 'intent.time_expired' || t === 'intent.closed') return 'failed';
-  if (/^transaction\.(purchase|authorize)\.pending_(online_)?external_action$/.test(t)) return 'action';
+  if (
+    t === 'intent.processed' ||
+    /^transaction\.(purchase|authorize|capture)\.successful$/.test(t)
+  )
+    return 'success';
+  if (
+    /^transaction\.(purchase|authorize)\.failed$/.test(t) ||
+    t === 'intent.time_expired' ||
+    t === 'intent.closed'
+  )
+    return 'failed';
+  if (
+    /^transaction\.(purchase|authorize)\.pending_(online_)?external_action$/.test(
+      t,
+    )
+  )
+    return 'action';
   return null;
 }

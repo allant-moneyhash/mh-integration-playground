@@ -11,7 +11,8 @@ export function useWebhookRedirect(intentId: string | null) {
   const done = useRef(false);
 
   useEffect(() => {
-    if (!intentId || !order || order.outcome === 'pending' || done.current) return;
+    if (!intentId || !order || order.outcome === 'pending' || done.current)
+      return;
     done.current = true;
     router.push(`/checkout/order?intent_id=${encodeURIComponent(intentId)}`);
   }, [intentId, order, router]);

@@ -5,9 +5,26 @@ import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { Dialog, DialogDescription, DialogTitle, DialogTrigger, SheetContent } from '@/components/ui/overlays';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { API_VERSIONS, ENVIRONMENTS, ENV_IDS, type ApiVersion } from '@/lib/hosts';
+import {
+  Dialog,
+  DialogDescription,
+  DialogTitle,
+  DialogTrigger,
+  SheetContent,
+} from '@/components/ui/overlays';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  API_VERSIONS,
+  ENVIRONMENTS,
+  ENV_IDS,
+  type ApiVersion,
+} from '@/lib/hosts';
 import { CURRENCIES, type Currency } from '@/lib/catalog';
 import { useConfig } from '@/store/config';
 import { useKeys } from '@/store/keys';
@@ -46,9 +63,19 @@ export function ConfigSheet() {
     const name = presetName.trim();
     if (!name) return;
     const withKeys = !!(keys.apiKey || keys.publicApiKey);
-    save(name, current(), withKeys ? { apiKey: keys.apiKey, publicApiKey: keys.publicApiKey } : undefined);
+    save(
+      name,
+      current(),
+      withKeys
+        ? { apiKey: keys.apiKey, publicApiKey: keys.publicApiKey }
+        : undefined,
+    );
     setPresetName('');
-    toast.success(withKeys ? `Saved "${name}" with its API keys (this browser only)` : `Saved "${name}" (demo account, no keys)`);
+    toast.success(
+      withKeys
+        ? `Saved "${name}" with its API keys (this browser only)`
+        : `Saved "${name}" (demo account, no keys)`,
+    );
   }
 
   function loadPreset(name: string) {
@@ -60,7 +87,11 @@ export function ConfigSheet() {
     // A preset saved with keys switches to that account; one without uses the demo account.
     if (p.keys) keys.setKeys(p.keys);
     else keys.clearKeys();
-    toast.success(p.keys ? `Loaded "${name}" with its API keys` : `Loaded "${name}" on the demo account`);
+    toast.success(
+      p.keys
+        ? `Loaded "${name}" with its API keys`
+        : `Loaded "${name}" on the demo account`,
+    );
   }
 
   return (
@@ -79,7 +110,10 @@ export function ConfigSheet() {
           </DialogDescription>
         </div>
         <div className="flex-1 space-y-8 overflow-y-auto p-6">
-          <Section title="Environment" help="Use keys from the matching MoneyHash environment. Live-mode keys work in both; the console flags LIVE MODE whenever an intent can move real money.">
+          <Section
+            title="Environment"
+            help="Use keys from the matching MoneyHash environment. Live-mode keys work in both; the console flags LIVE MODE whenever an intent can move real money."
+          >
             <div className="grid grid-cols-2 gap-2">
               {ENV_IDS.map(id => (
                 <Button
@@ -96,7 +130,10 @@ export function ConfigSheet() {
 
           <div className="grid grid-cols-2 gap-4">
             <Section title="API version">
-              <Select value={cfg.apiVersion} onValueChange={v => cfg.set({ apiVersion: v as ApiVersion })}>
+              <Select
+                value={cfg.apiVersion}
+                onValueChange={v => cfg.set({ apiVersion: v as ApiVersion })}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -111,7 +148,10 @@ export function ConfigSheet() {
               </Select>
             </Section>
             <Section title="Currency">
-              <Select value={currency} onValueChange={v => setCurrency(v as Currency)}>
+              <Select
+                value={currency}
+                onValueChange={v => setCurrency(v as Currency)}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -131,7 +171,10 @@ export function ConfigSheet() {
             help="On: the browser proves it may act on the intent (setIntentSecret, mh_intent_secret). Off: it doesn't, so accounts with “Require Intent Secret” return 401. Server calls with your API key never need it."
           >
             <label className="flex items-center gap-3 text-sm">
-              <Switch checked={cfg.useIntentSecret} onCheckedChange={v => cfg.set({ useIntentSecret: v })} />
+              <Switch
+                checked={cfg.useIntentSecret}
+                onCheckedChange={v => cfg.set({ useIntentSecret: v })}
+              />
               {cfg.useIntentSecret ? 'On' : 'Off'}
             </label>
           </Section>
@@ -175,28 +218,58 @@ export function ConfigSheet() {
                 onChange={e => setPresetName(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && savePreset()}
               />
-              <Button onClick={savePreset} disabled={!presetName.trim()} className="h-10">
+              <Button
+                onClick={savePreset}
+                disabled={!presetName.trim()}
+                className="h-10"
+              >
                 Save
               </Button>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => copyLink(current())}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => copyLink(current())}
+            >
               <Link2 className="size-3.5" /> Copy a link to the current setup
             </Button>
             {presets.length > 0 && (
               <ul className="mt-3 divide-y rounded-md border">
                 {presets.map(p => (
-                  <li key={p.name} className="flex items-center gap-2 px-3 py-2 text-sm">
+                  <li
+                    key={p.name}
+                    className="flex items-center gap-2 px-3 py-2 text-sm"
+                  >
                     <span className="flex-1 truncate">
                       {p.name}
-                      <span className="ms-2 text-xs text-subtler">{p.keys ? `${p.data.env === 'production' ? 'Production' : 'Staging'} keys` : 'Demo account'}</span>
+                      <span className="ms-2 text-xs text-subtler">
+                        {p.keys
+                          ? `${p.data.env === 'production' ? 'Production' : 'Staging'} keys`
+                          : 'Demo account'}
+                      </span>
                     </span>
-                    <Button variant="outline" size="sm" onClick={() => loadPreset(p.name)}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => loadPreset(p.name)}
+                    >
                       Load
                     </Button>
-                    <Button variant="ghost" size="icon" aria-label={`Copy a link to ${p.name}`} title="Copy share link" onClick={() => copyLink(p.data, p.name)}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Copy a link to ${p.name}`}
+                      title="Copy share link"
+                      onClick={() => copyLink(p.data, p.name)}
+                    >
                       <Link2 className="size-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" aria-label={`Delete ${p.name}`} onClick={() => remove(p.name)}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Delete ${p.name}`}
+                      onClick={() => remove(p.name)}
+                    >
                       <Trash2 className="size-4" />
                     </Button>
                   </li>
@@ -210,7 +283,15 @@ export function ConfigSheet() {
   );
 }
 
-function Section({ title, help, children }: { title: string; help?: string; children: React.ReactNode }) {
+function Section({
+  title,
+  help,
+  children,
+}: {
+  title: string;
+  help?: string;
+  children: React.ReactNode;
+}) {
   return (
     <section className="space-y-2">
       <h3 className="text-sm font-medium text-bolder">{title}</h3>

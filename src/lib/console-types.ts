@@ -1,4 +1,5 @@
-export type ConsoleSource = 'Backend API' | 'Frontend SDK' | 'Frontend' | 'Webhook' | 'Playground';
+export type ConsoleSource =
+  'Backend API' | 'Frontend SDK' | 'Frontend' | 'Webhook' | 'Playground';
 
 export type ConsoleEntry = {
   id: string;

@@ -28,7 +28,14 @@ function Checkout({ intentBody, session }: FlowCheckoutProps) {
   }
 
   // renderForm draws MoneyHash's form at its own height and resolves when it completes or fails.
-  if (ctx) return <IntentForm sdk={ctx.sdk} intentId={ctx.intentId} onDetails={() => router.replace(orderUrl(ctx.intentId))} />;
+  if (ctx)
+    return (
+      <IntentForm
+        sdk={ctx.sdk}
+        intentId={ctx.intentId}
+        onDetails={() => router.replace(orderUrl(ctx.intentId))}
+      />
+    );
 
   return (
     <div className="space-y-2">
@@ -46,14 +53,30 @@ export const sdkRenderFormFlow: IntegrationFlow = {
   api: 'payment',
   category: 'sdk',
   label: 'renderForm',
-  summary: 'Least UI work with the SDK: your server creates the intent and MoneyHash renders its full payment form (methods, wallets, saved cards) inside your page.',
+  summary:
+    'Least UI work with the SDK: your server creates the intent and MoneyHash renders its full payment form (methods, wallets, saved cards) inside your page.',
   ready: true,
   usesEmbedUrl: false,
   steps: session => [
-    { source: 'Backend API', label: 'POST /payments/intent/ (create intent, returns intent_secret)' },
-    { source: 'Frontend SDK', label: 'moneyHash.setIntentSecret(...)', secret: sdkSecretNote(session) },
-    { source: 'Frontend SDK', label: "moneyHash.renderForm({ selector, intentId, onHeightChange }) renders MoneyHash's form" },
-    { source: 'Webhook', label: 'MoneyHash posts webhooks to your backend; the order page shows the result' },
+    {
+      source: 'Backend API',
+      label: 'POST /payments/intent/ (create intent, returns intent_secret)',
+    },
+    {
+      source: 'Frontend SDK',
+      label: 'moneyHash.setIntentSecret(...)',
+      secret: sdkSecretNote(session),
+    },
+    {
+      source: 'Frontend SDK',
+      label:
+        "moneyHash.renderForm({ selector, intentId, onHeightChange }) renders MoneyHash's form",
+    },
+    {
+      source: 'Webhook',
+      label:
+        'MoneyHash posts webhooks to your backend; the order page shows the result',
+    },
   ],
   Checkout,
 };

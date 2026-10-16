@@ -21,10 +21,16 @@ export function WebhookWatcher({ intentId }: { intentId: string | null }) {
     let stopped = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let cursor: string | null = null;
-    const seen = new Set(useConsole.getState().entries.filter(e => e.source === 'Webhook').map(e => e.id));
+    const seen = new Set(
+      useConsole
+        .getState()
+        .entries.filter(e => e.source === 'Webhook')
+        .map(e => e.id),
+    );
 
     const schedule = () => {
-      if (!stopped && Date.now() - started < MAX_WATCH_MS) timer = setTimeout(poll, POLL_MS);
+      if (!stopped && Date.now() - started < MAX_WATCH_MS)
+        timer = setTimeout(poll, POLL_MS);
     };
 
     async function poll() {
@@ -35,7 +41,10 @@ export function WebhookWatcher({ intentId }: { intentId: string | null }) {
         if (cursor) q.set('after', cursor);
         const res = await fetch(`/api/webhooks?${q}`, { cache: 'no-store' });
         if (res.ok) {
-          const body = (await res.json()) as { events: StoredWebhook[]; cursor: string | null };
+          const body = (await res.json()) as {
+            events: StoredWebhook[];
+            cursor: string | null;
+          };
           cursor = body.cursor;
           const state = useConsole.getState();
           const fresh = body.events.filter(e => !seen.has(e.id));
@@ -63,7 +72,10 @@ export function WebhookWatcher({ intentId }: { intentId: string | null }) {
             );
           }
           if (body.events.length) {
-            const order = foldOrder(state.orders[intentId!] ?? null, body.events);
+            const order = foldOrder(
+              state.orders[intentId!] ?? null,
+              body.events,
+            );
             if (order) state.setOrder(order);
             if (isFinal(order?.outcome)) return; // final: stop polling
           }

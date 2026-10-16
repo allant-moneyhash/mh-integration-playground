@@ -10,25 +10,48 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
-import type { BinLookUpData, CardData, InstallmentPlan, Method, NativeReceiptData } from '@moneyhash/js-sdk/headless';
+import type {
+  BinLookUpData,
+  CardData,
+  InstallmentPlan,
+  Method,
+  NativeReceiptData,
+} from '@moneyhash/js-sdk/headless';
 import { Button } from '@/components/ui/button';
 import { createPaymentIntent } from '@/lib/api-client';
 import { formatMoney, type Currency } from '@/lib/catalog';
 import type { IntentBody } from '@/lib/intent-body';
 import { useConfig } from '@/store/config';
 import { accountKey, type Session } from '../../session';
-import { applyIntentSecret, createSdk, noteNextCall, type Sdk } from '../runtime';
+import {
+  applyIntentSecret,
+  createSdk,
+  noteNextCall,
+  type Sdk,
+} from '../runtime';
 import { CardForm, errorText } from './card-form';
 import { ExpressCheckout } from './express';
 import { checkoutIsDone, orderUrl, StateRenderer } from './sdk-checkout';
 
 type Details = Awaited<ReturnType<Sdk['getIntentDetails']>>;
-type Checked = { card: CardData; bin: BinLookUpData | null; plans: InstallmentPlan[]; plansError: string | null; saveCard?: boolean };
+type Checked = {
+  card: CardData;
+  bin: BinLookUpData | null;
+  plans: InstallmentPlan[];
+  plansError: string | null;
+  saveCard?: boolean;
+};
 
 /** The demo merchant rule: a bank offer on the looked-up card. Real stores use their own rules. */
 const OFFER_PERCENT = 10;
 
-export function CardFirstCheckout({ intentBody, session }: { intentBody: IntentBody; session: Session }) {
+export function CardFirstCheckout({
+  intentBody,
+  session,
+}: {
+  intentBody: IntentBody;
+  session: Session;
+}) {
   const router = useRouter();
   const cardLayout = useConfig(s => s.cardFormLayout);
   const customerId = useConfig(s => s.customerIds[accountKey(session)] ?? '');
@@ -43,12 +66,17 @@ export function CardFirstCheckout({ intentBody, session }: { intentBody: IntentB
   const started = useRef(false);
   /** Wallet buttons need nativePayData, which only getMethods returns. */
   const [wallets, setWallets] = useState<Method[]>([]);
-  const [walletLookup, setWalletLookup] = useState<{ method: string; bin: BinLookUpData | null } | null>(null);
-  const flowId = typeof intentBody.flow_id === 'string' ? intentBody.flow_id : undefined;
+  const [walletLookup, setWalletLookup] = useState<{
+    method: string;
+    bin: BinLookUpData | null;
+  } | null>(null);
+  const flowId =
+    typeof intentBody.flow_id === 'string' ? intentBody.flow_id : undefined;
 
   const currency = String(intentBody.amount_currency) as Currency;
   const base = Number(intentBody.amount);
-  const discount = checked && offer ? Math.round(base * OFFER_PERCENT) / 100 : 0;
+  const discount =
+    checked && offer ? Math.round(base * OFFER_PERCENT) / 100 : 0;
   const total = Math.round((base - discount) * 100) / 100;
 
   useEffect(() => {
@@ -58,7 +86,10 @@ export function CardFirstCheckout({ intentBody, session }: { intentBody: IntentB
       try {
         const s = await createSdk(session);
         setSdk(s);
-        noteNextCall('getMethods', 'Wallet setup: lists the Apple Pay / Google Pay buttons (nativePayData), so a wallet receipt can be looked up too.');
+        noteNextCall(
+          'getMethods',
+          'Wallet setup: lists the Apple Pay / Google Pay buttons (nativePayData), so a wallet receipt can be looked up too.',
+        );
         const m = await s
           .getMethods({
             currency: String(intentBody.amount_currency),
@@ -76,7 +107,12 @@ export function CardFirstCheckout({ intentBody, session }: { intentBody: IntentB
 
   /** The intent body both paths share; the card path sets the final amount and CARD. */
   function bodyFor(amount: number, method?: string): IntentBody {
-    const body: IntentBody = { ...intentBody, amount, form_only: true, hide_loader_message: true };
+    const body: IntentBody = {
+      ...intentBody,
+      amount,
+      form_only: true,
+      hide_loader_message: true,
+    };
     if (method) body.payment_method = method;
     body.threeds = { enabled: true, ...(body.threeds as object) };
     if (!body.flow_id) body.operation = body.operation ?? 'purchase';
@@ -94,13 +130,28 @@ export function CardFirstCheckout({ intentBody, session }: { intentBody: IntentB
     if (!sdk) throw new Error('SDK not ready');
     setError(null);
     try {
-      const bin = await sdk.binLookupByReceipt({ nativeReceiptData: receipt, methodId, ...(flowId ? { flowId } : {}) }).catch(() => null);
+      const bin = await sdk
+        .binLookupByReceipt({
+          nativeReceiptData: receipt,
+          methodId,
+          ...(flowId ? { flowId } : {}),
+        })
+        .catch(() => null);
       setWalletLookup({ method: methodId, bin });
       const res = await createPaymentIntent(session, bodyFor(base));
       applyIntentSecret(sdk, session, res.data.intent_secret);
       setIntentId(res.data.id);
-      await sdk.proceedWith({ intentId: res.data.id, type: 'method', id: methodId });
-      setDetails(await sdk.submitPaymentReceipt({ intentId: res.data.id, nativeReceiptData: receipt }));
+      await sdk.proceedWith({
+        intentId: res.data.id,
+        type: 'method',
+        id: methodId,
+      });
+      setDetails(
+        await sdk.submitPaymentReceipt({
+          intentId: res.data.id,
+          nativeReceiptData: receipt,
+        }),
+      );
     } catch (e) {
       setError(errorText(e));
       throw e;
@@ -108,7 +159,8 @@ export function CardFirstCheckout({ intentBody, session }: { intentBody: IntentB
   }
 
   useEffect(() => {
-    if (details && intentId && checkoutIsDone(details)) router.replace(orderUrl(intentId));
+    if (details && intentId && checkoutIsDone(details))
+      router.replace(orderUrl(intentId));
   }, [details, intentId, router]);
 
   /** Step 1: collect the card (no intent yet), then BIN lookup and installment plans for it. */
@@ -116,13 +168,23 @@ export function CardFirstCheckout({ intentBody, session }: { intentBody: IntentB
     if (!sdk) return;
     setError(null);
     const card = await sdk.cardForm.collect();
-    const bin = await sdk.cardForm.binLookup({ cardData: card }).catch(() => null);
+    const bin = await sdk.cardForm
+      .binLookup({ cardData: card })
+      .catch(() => null);
     let plansError: string | null = null;
-    const plans = await sdk.getInstallmentPlans({ first6Digits: card.first_six_digits, amount: String(base), currency }).catch(e => {
-      const t = errorText(e);
-      plansError = /EMI is not supported/i.test(t) ? 'Installments (EMI) are not set up for card on this account.' : t;
-      return [] as InstallmentPlan[];
-    });
+    const plans = await sdk
+      .getInstallmentPlans({
+        first6Digits: card.first_six_digits,
+        amount: String(base),
+        currency,
+      })
+      .catch(e => {
+        const t = errorText(e);
+        plansError = /EMI is not supported/i.test(t)
+          ? 'Installments (EMI) are not set up for card on this account.'
+          : t;
+        return [] as InstallmentPlan[];
+      });
     setPlanId('');
     setChecked({ card, bin, plans, plansError, saveCard });
   }
@@ -137,12 +199,23 @@ export function CardFirstCheckout({ intentBody, session }: { intentBody: IntentB
       applyIntentSecret(sdk, session, res.data.intent_secret);
       setIntentId(res.data.id);
       const plan = checked.plans.find(p => p.id === planId);
-      if (plan) noteNextCall('cardForm.pay', 'Paid with the card collected before the intent, with the installment plan the customer picked.');
+      if (plan)
+        noteNextCall(
+          'cardForm.pay',
+          'Paid with the card collected before the intent, with the installment plan the customer picked.',
+        );
       const d = await sdk.cardForm.pay({
         intentId: res.data.id,
         cardData: checked.card,
         ...(customerId ? { saveCard: checked.saveCard } : {}),
-        ...(plan ? { installmentPlanData: { planId: plan.id, ...(plan.issuerCode ? { issuerCode: plan.issuerCode } : {}) } } : {}),
+        ...(plan
+          ? {
+              installmentPlanData: {
+                planId: plan.id,
+                ...(plan.issuerCode ? { issuerCode: plan.issuerCode } : {}),
+              },
+            }
+          : {}),
       });
       setDetails(d);
     } catch (e) {
@@ -165,7 +238,12 @@ export function CardFirstCheckout({ intentBody, session }: { intentBody: IntentB
   if (details && intentId) {
     return (
       <div className="space-y-4">
-        {walletLookup && <LookupTable title={`${walletLookup.method.replace('_', ' ')} card (from the receipt)`} bin={walletLookup.bin} />}
+        {walletLookup && (
+          <LookupTable
+            title={`${walletLookup.method.replace('_', ' ')} card (from the receipt)`}
+            bin={walletLookup.bin}
+          />
+        )}
         <div className="rounded-md border border-input">
           <StateRenderer
             sdk={sdk}
@@ -186,19 +264,43 @@ export function CardFirstCheckout({ intentBody, session }: { intentBody: IntentB
     <div className="space-y-6">
       {!checked && (
         <div>
-          <ExpressCheckout methods={wallets} sdk={sdk} live={session.env === 'production'} onReceipt={onReceipt} />
+          <ExpressCheckout
+            methods={wallets}
+            sdk={sdk}
+            live={session.env === 'production'}
+            onReceipt={onReceipt}
+          />
           {wallets.some(w => w.nativePayData) && (
-            <p className="mt-1 text-xs text-subtler">Wallets: binLookupByReceipt reads the card behind the receipt before the payment is submitted.</p>
+            <p className="mt-1 text-xs text-subtler">
+              Wallets: binLookupByReceipt reads the card behind the receipt
+              before the payment is submitted.
+            </p>
           )}
         </div>
       )}
-      {walletLookup && <LookupTable title={`${walletLookup.method.replace('_', ' ')} card (from the receipt)`} bin={walletLookup.bin} />}
+      {walletLookup && (
+        <LookupTable
+          title={`${walletLookup.method.replace('_', ' ')} card (from the receipt)`}
+          bin={walletLookup.bin}
+        />
+      )}
       <div>
         <h3 className="font-medium text-bolder">Card</h3>
-        <p className="text-sm text-subtler">No intent yet: the card is collected first so the store can price the order.</p>
+        <p className="text-sm text-subtler">
+          No intent yet: the card is collected first so the store can price the
+          order.
+        </p>
         {/* Kept mounted after the check so "Change card" keeps what was typed. */}
-        <div className={checked ? 'hidden' : 'mt-2 rounded-md border border-input'}>
-          <CardForm sdk={sdk} layout={cardLayout} payLabel="Check card" onPay={checkCard} offerSaveCard={!!customerId} />
+        <div
+          className={checked ? 'hidden' : 'mt-2 rounded-md border border-input'}
+        >
+          <CardForm
+            sdk={sdk}
+            layout={cardLayout}
+            payLabel="Check card"
+            onPay={checkCard}
+            offerSaveCard={!!customerId}
+          />
         </div>
       </div>
 
@@ -206,23 +308,35 @@ export function CardFirstCheckout({ intentBody, session }: { intentBody: IntentB
         <div className="space-y-4">
           <div className="flex items-center justify-between rounded-md border border-input p-4 text-sm">
             <span className="text-bolder">
-              {bin?.brand ?? checked.card.card_scheme} •••• {checked.card.last_four_digits}
+              {bin?.brand ?? checked.card.card_scheme} ••••{' '}
+              {checked.card.last_four_digits}
             </span>
-            <Button variant="ghost" size="sm" disabled={busy} onClick={() => setChecked(null)}>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={busy}
+              onClick={() => setChecked(null)}
+            >
               Change card
             </Button>
           </div>
 
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-md border border-input p-4 text-sm">
             <dt className="text-subtle">BIN</dt>
-            <dd className="text-bolder">{bin?.firstSixDigits ?? checked.card.first_six_digits}</dd>
+            <dd className="text-bolder">
+              {bin?.firstSixDigits ?? checked.card.first_six_digits}
+            </dd>
             <dt className="text-subtle">Type</dt>
             <dd className="text-bolder">{bin?.cardType ?? 'Unknown'}</dd>
             <dt className="text-subtle">Issuer</dt>
             <dd className="text-bolder">{bin?.issuer ?? 'Unknown'}</dd>
             <dt className="text-subtle">Issuer country</dt>
             <dd className="text-bolder">{bin?.issuerCountry ?? 'Unknown'}</dd>
-            {!bin && <dd className="col-span-2 text-xs text-subtler">BIN lookup returned nothing for this card (see the console).</dd>}
+            {!bin && (
+              <dd className="col-span-2 text-xs text-subtler">
+                BIN lookup returned nothing for this card (see the console).
+              </dd>
+            )}
           </dl>
 
           <label className="flex items-start gap-3 rounded-md border border-input p-4 text-sm">
@@ -235,9 +349,13 @@ export function CardFirstCheckout({ intentBody, session }: { intentBody: IntentB
             />
             <span>
               <span className="text-bolder">
-                Bank offer: {OFFER_PERCENT}% off with {bin?.issuer ?? bin?.brand ?? 'this card'}
+                Bank offer: {OFFER_PERCENT}% off with{' '}
+                {bin?.issuer ?? bin?.brand ?? 'this card'}
               </span>
-              <span className="block text-subtle">A demo store rule using the lookup. Your server decides the amount before it creates the intent.</span>
+              <span className="block text-subtle">
+                A demo store rule using the lookup. Your server decides the
+                amount before it creates the intent.
+              </span>
             </span>
           </label>
 
@@ -246,17 +364,27 @@ export function CardFirstCheckout({ intentBody, session }: { intentBody: IntentB
             <div className="mt-2 divide-y divide-input rounded-md border border-input">
               {checked.plans.length === 0 && (
                 <p className="p-4 text-sm text-subtle">
-                  {checked.plansError ?? 'No installment plans for this card and amount (getInstallmentPlans returned none).'}
+                  {checked.plansError ??
+                    'No installment plans for this card and amount (getInstallmentPlans returned none).'}
                 </p>
               )}
               {checked.plans.length > 0 && (
                 <label className="flex cursor-pointer items-center gap-3 p-3 text-sm">
-                  <input type="radio" name="mh-plan" className="size-4 accent-[hsl(var(--primary))]" checked={planId === ''} onChange={() => setPlanId('')} />
+                  <input
+                    type="radio"
+                    name="mh-plan"
+                    className="size-4 accent-[hsl(var(--primary))]"
+                    checked={planId === ''}
+                    onChange={() => setPlanId('')}
+                  />
                   <span className="text-bolder">Pay in full</span>
                 </label>
               )}
               {checked.plans.map(p => (
-                <label key={p.id} className="flex cursor-pointer items-center gap-3 p-3 text-sm">
+                <label
+                  key={p.id}
+                  className="flex cursor-pointer items-center gap-3 p-3 text-sm"
+                >
                   <input
                     type="radio"
                     name="mh-plan"
@@ -265,14 +393,25 @@ export function CardFirstCheckout({ intentBody, session }: { intentBody: IntentB
                     onChange={() => setPlanId(p.id)}
                   />
                   <span className="flex-1 text-bolder">
-                    {p.installmentPeriod} months × {p.amount.formatted} {p.amount.currency}
-                    {p.issuerNameEn && <span className="text-subtle"> · {p.issuerNameEn}</span>}
+                    {p.installmentPeriod} months × {p.amount.formatted}{' '}
+                    {p.amount.currency}
+                    {p.issuerNameEn && (
+                      <span className="text-subtle"> · {p.issuerNameEn}</span>
+                    )}
                   </span>
-                  <span className="text-xs text-subtle">{p.interestRate ? `${p.interestRate}% interest` : 'No interest'}</span>
+                  <span className="text-xs text-subtle">
+                    {p.interestRate
+                      ? `${p.interestRate}% interest`
+                      : 'No interest'}
+                  </span>
                 </label>
               ))}
             </div>
-            {checked.plans.length > 0 && offer && <p className="mt-1 text-xs text-subtler">Plans were listed for the full amount, before the bank offer.</p>}
+            {checked.plans.length > 0 && offer && (
+              <p className="mt-1 text-xs text-subtler">
+                Plans were listed for the full amount, before the bank offer.
+              </p>
+            )}
           </div>
 
           <div className="space-y-1 rounded-md border border-input p-4 text-sm">
@@ -304,10 +443,18 @@ export function CardFirstCheckout({ intentBody, session }: { intentBody: IntentB
 }
 
 /** What a BIN lookup returned, as the store would use it. */
-function LookupTable({ title, bin }: { title: string; bin: BinLookUpData | null }) {
+function LookupTable({
+  title,
+  bin,
+}: {
+  title: string;
+  bin: BinLookUpData | null;
+}) {
   return (
     <dl className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-md border border-input p-4 text-sm">
-      <dt className="col-span-2 font-medium capitalize text-bolder">{title.toLowerCase()}</dt>
+      <dt className="col-span-2 font-medium capitalize text-bolder">
+        {title.toLowerCase()}
+      </dt>
       {bin ? (
         <>
           <dt className="text-subtle">Brand</dt>
@@ -320,7 +467,9 @@ function LookupTable({ title, bin }: { title: string; bin: BinLookUpData | null 
           <dd className="text-bolder">{bin.issuerCountry ?? 'Unknown'}</dd>
         </>
       ) : (
-        <dd className="col-span-2 text-xs text-subtler">The lookup returned nothing for this card (see the console).</dd>
+        <dd className="col-span-2 text-xs text-subtler">
+          The lookup returned nothing for this card (see the console).
+        </dd>
       )}
     </dl>
   );

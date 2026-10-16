@@ -29,5 +29,7 @@ export function isEnvId(v: unknown): v is EnvId {
 }
 
 export function isApiVersion(v: unknown): v is ApiVersion {
-  return typeof v === 'string' && (API_VERSIONS as readonly string[]).includes(v);
+  return (
+    typeof v === 'string' && (API_VERSIONS as readonly string[]).includes(v)
+  );
 }

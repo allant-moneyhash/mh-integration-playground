@@ -30,7 +30,16 @@ export function webhookUrl(origin: string, env: EnvId) {
   return `${origin}/api/webhooks?env=${env}`;
 }
 
-export function buildIntentBody({ lines, total, currency, customer, options, origin, env, flowFields }: Input): IntentBody {
+export function buildIntentBody({
+  lines,
+  total,
+  currency,
+  customer,
+  options,
+  origin,
+  env,
+  flowFields,
+}: Input): IntentBody {
   const order = orderPageUrl(origin);
   const body: IntentBody = {
     amount: total,
@@ -102,7 +111,10 @@ export function buildIntentBody({ lines, total, currency, customer, options, ori
       const n = Number(value);
       if (Number.isFinite(n)) body[opt.key] = n;
     } else if (opt.kind === 'list') {
-      const list = String(value).split(',').map(s => s.trim()).filter(Boolean);
+      const list = String(value)
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean);
       if (list.length) body[opt.key] = list;
     } else {
       body[opt.key] = value;

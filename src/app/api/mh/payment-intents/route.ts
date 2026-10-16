@@ -21,7 +21,12 @@ export async function POST(req: Request) {
       apiVersion?: unknown;
       intent?: unknown;
     } | null;
-    if (!input || typeof input.intent !== 'object' || input.intent === null || Array.isArray(input.intent)) {
+    if (
+      !input ||
+      typeof input.intent !== 'object' ||
+      input.intent === null ||
+      Array.isArray(input.intent)
+    ) {
       throw new RequestError(400, 'The intent request must be a JSON object.');
     }
     const target = parseTarget(input.env, input.apiVersion);
@@ -53,7 +58,8 @@ export async function POST(req: Request) {
       }
       throw new RequestError(403, LIVE_KEY_MESSAGE, entries);
     }
-    if (created.ok && isLiveResponse(created.data)) created.entry.note = LIVE_NOTE;
+    if (created.ok && isLiveResponse(created.data))
+      created.entry.note = LIVE_NOTE;
 
     return Response.json(
       { ok: created.ok, status: created.status, data: created.data, entries },

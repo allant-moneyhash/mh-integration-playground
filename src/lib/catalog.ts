@@ -70,7 +70,8 @@ export const products: Product[] = [
     description:
       'A statement tee featuring an isometric cube graphic made of delicate dots on a soft peach background.',
     imageSrc: '/images/products/product-page-01-related-product-04.png',
-    imageAlt: "Front of men's Artwork Tee in peach with dots forming an isometric cube.",
+    imageAlt:
+      "Front of men's Artwork Tee in peach with dots forming an isometric cube.",
     price: { USD: 35, EGP: 1000, SAR: 70, AED: 65, KWD: 7, ZAR: 650 },
     rating: 4,
   },
@@ -148,7 +149,8 @@ export type TestCardSet = {
 
 const checkoutCom: TestCardSet = {
   providerName: 'Checkout.com',
-  docsLink: 'https://www.checkout.com/docs/developer-resources/testing/test-cards',
+  docsLink:
+    'https://www.checkout.com/docs/developer-resources/testing/test-cards',
   frictionless: '5436031030606378',
   challenge: '4242424242424242',
   failed: '4150561000000019',
@@ -180,7 +182,8 @@ export const testCards: Record<Currency, TestCardSet> = {
   },
   ZAR: {
     providerName: 'Peach Payments',
-    docsLink: 'https://developer.peachpayments.com/docs/reference-test-and-go-live',
+    docsLink:
+      'https://developer.peachpayments.com/docs/reference-test-and-go-live',
     frictionless: '4200000000000091',
     challenge: '4200000000000042',
     failed: '4012001037461114',

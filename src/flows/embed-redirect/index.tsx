@@ -39,7 +39,8 @@ function Checkout({ intentBody, session }: FlowCheckoutProps) {
     <div className="space-y-2">
       {loading && (
         <p className="flex items-center justify-center gap-2 text-sm text-subtle">
-          <Loader2 className="size-4 animate-spin" /> Creating the intent, then sending you to MoneyHash…
+          <Loader2 className="size-4 animate-spin" /> Creating the intent, then
+          sending you to MoneyHash…
         </p>
       )}
       {error && (
@@ -59,14 +60,30 @@ export const embedRedirectFlow: IntegrationFlow = {
   api: 'payment',
   category: 'hosted',
   label: 'Embed page (redirect)',
-  summary: 'Your server creates the intent and sends the customer to the MoneyHash-hosted page.',
+  summary:
+    'Your server creates the intent and sends the customer to the MoneyHash-hosted page.',
   ready: true,
   usesEmbedUrl: true,
   steps: session => [
-    { source: 'Backend API', label: 'POST /payments/intent/ (create intent, returns embed_url)' },
-    { source: 'Frontend', label: 'Redirect the browser to embed_url', secret: embedSecretNote(session) },
-    { source: 'Webhook', label: 'MoneyHash posts transaction and intent webhooks to your backend, which updates the order' },
-    { source: 'Frontend', label: 'Customer lands on the redirect URL; the order page shows the status your backend got from the webhook' },
+    {
+      source: 'Backend API',
+      label: 'POST /payments/intent/ (create intent, returns embed_url)',
+    },
+    {
+      source: 'Frontend',
+      label: 'Redirect the browser to embed_url',
+      secret: embedSecretNote(session),
+    },
+    {
+      source: 'Webhook',
+      label:
+        'MoneyHash posts transaction and intent webhooks to your backend, which updates the order',
+    },
+    {
+      source: 'Frontend',
+      label:
+        'Customer lands on the redirect URL; the order page shows the status your backend got from the webhook',
+    },
   ],
   Checkout,
 };

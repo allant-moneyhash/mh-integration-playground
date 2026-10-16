@@ -50,7 +50,10 @@ export function SavedCards({
     <div className="space-y-3">
       <div className="divide-y divide-input rounded-md border border-input">
         {cards.map(c => (
-          <label key={c.id} className="flex cursor-pointer items-center gap-4 p-4">
+          <label
+            key={c.id}
+            className="flex cursor-pointer items-center gap-4 p-4"
+          >
             <input
               type="radio"
               name="mh-saved-card"
@@ -65,7 +68,11 @@ export function SavedCards({
             {c.logo ? (
               // Card brand logo from MoneyHash.
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={c.logo} alt={c.brand} className="h-6 w-[34px] object-contain" />
+              <img
+                src={c.logo}
+                alt={c.brand}
+                className="h-6 w-[34px] object-contain"
+              />
             ) : (
               <CreditCard className="size-6 text-subtler" />
             )}
@@ -86,7 +93,11 @@ export function SavedCards({
                   act(`delete-${c.id}`, () => onDelete(c));
                 }}
               >
-                {busy === `delete-${c.id}` ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+                {busy === `delete-${c.id}` ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Trash2 className="size-4" />
+                )}
               </button>
             )}
           </label>
@@ -94,14 +105,28 @@ export function SavedCards({
       </div>
       {card && (
         <div className="flex items-start gap-3">
-          <Input label="CVV" inputMode="numeric" maxLength={4} value={cvv} onChange={e => setCvv(e.target.value.replace(/\D/g, ''))} containerClassName="w-32" />
-          <Button className={cn('h-10 flex-1')} disabled={disabled || !!busy || cvv.length < 3} onClick={() => act('pay', () => onPay(card, cvv))}>
+          <Input
+            label="CVV"
+            inputMode="numeric"
+            maxLength={4}
+            value={cvv}
+            onChange={e => setCvv(e.target.value.replace(/\D/g, ''))}
+            containerClassName="w-32"
+          />
+          <Button
+            className={cn('h-10 flex-1')}
+            disabled={disabled || !!busy || cvv.length < 3}
+            onClick={() => act('pay', () => onPay(card, cvv))}
+          >
             {busy === 'pay' && <Loader2 className="size-4 animate-spin" />}
             {payLabel(card)}
           </Button>
         </div>
       )}
-      <p className="text-xs text-subtle">MoneyHash lists only the saved cards usable for this payment (same provider connection, currency and flow), so a customer may have more.</p>
+      <p className="text-xs text-subtle">
+        MoneyHash lists only the saved cards usable for this payment (same
+        provider connection, currency and flow), so a customer may have more.
+      </p>
       {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );

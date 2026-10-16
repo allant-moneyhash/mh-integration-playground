@@ -4,15 +4,36 @@
 // previous activity). Click a row to open it: a plain explanation, what to do on
 // errors, and Request / Response tabs. Logs can be cleared or deleted.
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, BookOpen, ChevronRight, Copy, Download, History, Info, PanelRightClose, PanelRightOpen, Pencil, Trash2 } from 'lucide-react';
+import {
+  ArrowLeft,
+  BookOpen,
+  ChevronRight,
+  Copy,
+  Download,
+  History,
+  Info,
+  PanelRightClose,
+  PanelRightOpen,
+  Pencil,
+  Trash2,
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 import { usePathname } from 'next/navigation';
-import { contextBefore, explain, nextState, type ExplainContext } from '@/lib/console-explain';
+import {
+  contextBefore,
+  explain,
+  nextState,
+  type ExplainContext,
+} from '@/lib/console-explain';
 import { useConfig } from '@/store/config';
 import { Button } from '@/components/ui/button';
 import { useConsole } from '@/store/console';
 import { useHydrated } from '@/lib/use-hydrated';
-import type { ConsoleAttempt, ConsoleEntry, ConsoleSource } from '@/lib/console-types';
+import type {
+  ConsoleAttempt,
+  ConsoleEntry,
+  ConsoleSource,
+} from '@/lib/console-types';
 import { maskDeep } from '@/lib/mask';
 import { cn } from '@/lib/cn';
 import { JsonView } from './json-view';
@@ -29,14 +50,29 @@ const SOURCE_HINT: Record<ConsoleSource, string> = {
 };
 
 /** What the panel shows: the checkout in progress, the History list, or one past checkout. */
-type View = { kind: 'current' } | { kind: 'history' } | { kind: 'past'; attemptId: string };
+type View =
+  | { kind: 'current' }
+  | { kind: 'history' }
+  | { kind: 'past'; attemptId: string };
 
-const clock = (ts: number) => new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
+const clock = (ts: number) =>
+  new Date(ts).toLocaleTimeString([], {
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+  });
 const dayOf = (ts: number) => {
   const d = new Date(ts);
-  return d.toDateString() === new Date().toDateString() ? 'Today' : d.toLocaleDateString([], { day: 'numeric', month: 'short' });
+  return d.toDateString() === new Date().toDateString()
+    ? 'Today'
+    : d.toLocaleDateString([], { day: 'numeric', month: 'short' });
 };
-const gap = (ms: number) => (ms < 1000 ? `${Math.max(0, ms)}ms` : ms < 60_000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.round(ms / 60_000)} min`);
+const gap = (ms: number) =>
+  ms < 1000
+    ? `${Math.max(0, ms)}ms`
+    : ms < 60_000
+      ? `${(ms / 1000).toFixed(1)}s`
+      : `${Math.round(ms / 60_000)} min`;
 
 export function ConsolePanel({ className }: { className?: string }) {
   const hydrated = useHydrated();
@@ -52,16 +88,30 @@ export function ConsolePanel({ className }: { className?: string }) {
     setView({ kind: 'current' });
   }
 
-  const attemptOf = (id: string | null) => attempts.find(a => a.id === id) ?? null;
+  const attemptOf = (id: string | null) =>
+    attempts.find(a => a.id === id) ?? null;
   const entriesOf = (id: string) => entries.filter(e => e.attemptId === id);
-  const shown = view.kind === 'past' ? attemptOf(view.attemptId) : view.kind === 'current' ? attemptOf(currentId) : null;
+  const shown =
+    view.kind === 'past'
+      ? attemptOf(view.attemptId)
+      : view.kind === 'current'
+        ? attemptOf(currentId)
+        : null;
   const past = [...attempts].reverse().filter(a => a.id !== currentId);
 
   function exportLog(attempt: ConsoleAttempt) {
     // Entries are already masked; mask again in case anything slipped through.
     const list = entriesOf(attempt.id);
-    const data = { checkout: attempt, calls: list.map((e, i) => ({ ...e, explanation: explain(e, contextBefore(list, i)) })) };
-    const blob = new Blob([JSON.stringify(maskDeep(data), null, 2)], { type: 'application/json' });
+    const data = {
+      checkout: attempt,
+      calls: list.map((e, i) => ({
+        ...e,
+        explanation: explain(e, contextBefore(list, i)),
+      })),
+    };
+    const blob = new Blob([JSON.stringify(maskDeep(data), null, 2)], {
+      type: 'application/json',
+    });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `moneyhash-checkout-${new Date(attempt.startedAt).toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
@@ -69,40 +119,91 @@ export function ConsolePanel({ className }: { className?: string }) {
     URL.revokeObjectURL(a.href);
   }
 
-  if (!hydrated) return <aside className={cn('border bg-background lg:rounded-md', className)} />;
+  if (!hydrated)
+    return (
+      <aside className={cn('border bg-background lg:rounded-md', className)} />
+    );
 
   return (
-    <aside className={cn('flex min-h-0 flex-col border bg-background lg:rounded-md', className)}>
+    <aside
+      className={cn(
+        'flex min-h-0 flex-col border bg-background lg:rounded-md',
+        className,
+      )}
+    >
       <div className="flex items-center gap-2 border-b px-4 py-3">
         <div className="min-w-0 flex-1">
-          <h2 className="text-base font-medium text-bolder">{view.kind === 'history' ? 'History' : view.kind === 'past' ? 'Past checkout' : 'All activities'}</h2>
+          <h2 className="text-base font-medium text-bolder">
+            {view.kind === 'history'
+              ? 'History'
+              : view.kind === 'past'
+                ? 'Past checkout'
+                : 'All activities'}
+          </h2>
           <p className="truncate text-xs text-subtle">
-            {view.kind === 'history' ? 'Earlier checkouts in this browser.' : 'Every call between your store and MoneyHash in this checkout.'}
+            {view.kind === 'history'
+              ? 'Earlier checkouts in this browser.'
+              : 'Every call between your store and MoneyHash in this checkout.'}
           </p>
         </div>
         {view.kind === 'current' ? (
-          <Button variant="outline" size="sm" onClick={() => setView({ kind: 'history' })} disabled={!past.length} title="Earlier checkouts">
-            <History className="size-4" /> History{past.length ? ` (${past.length})` : ''}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setView({ kind: 'history' })}
+            disabled={!past.length}
+            title="Earlier checkouts"
+          >
+            <History className="size-4" /> History
+            {past.length ? ` (${past.length})` : ''}
           </Button>
         ) : (
-          <Button variant="outline" size="sm" onClick={() => setView(view.kind === 'past' ? { kind: 'history' } : { kind: 'current' })}>
-            <ArrowLeft className="size-4" /> {view.kind === 'past' ? 'History' : 'Current'}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              setView(
+                view.kind === 'past'
+                  ? { kind: 'history' }
+                  : { kind: 'current' },
+              )
+            }
+          >
+            <ArrowLeft className="size-4" />{' '}
+            {view.kind === 'past' ? 'History' : 'Current'}
           </Button>
         )}
-        <Button variant="outline" size="icon" aria-label="Hide console" title="Hide" onClick={() => useConfig.getState().set({ showConsole: false })}>
+        <Button
+          variant="outline"
+          size="icon"
+          aria-label="Hide console"
+          title="Hide"
+          onClick={() => useConfig.getState().set({ showConsole: false })}
+        >
           <PanelRightClose className="size-4" />
         </Button>
       </div>
 
       <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
         {view.kind === 'history' ? (
-          <HistoryList attempts={past} entriesOf={entriesOf} onOpen={id => setView({ kind: 'past', attemptId: id })} />
+          <HistoryList
+            attempts={past}
+            entriesOf={entriesOf}
+            onOpen={id => setView({ kind: 'past', attemptId: id })}
+          />
         ) : shown ? (
-          <CheckoutLog attempt={shown} entries={entriesOf(shown.id)} onExport={() => exportLog(shown)} />
+          <CheckoutLog
+            attempt={shown}
+            entries={entriesOf(shown.id)}
+            onExport={() => exportLog(shown)}
+          />
         ) : (
           <div className="p-8 text-center text-sm text-subtle">
             <p className="text-bolder">Ready for a new checkout</p>
-            <p className="mt-1">Continue to payment and every call appears here, with a plain explanation.</p>
+            <p className="mt-1">
+              Continue to payment and every call appears here, with a plain
+              explanation.
+            </p>
           </div>
         )}
       </div>
@@ -110,10 +211,23 @@ export function ConsolePanel({ className }: { className?: string }) {
   );
 }
 
-function HistoryList({ attempts, entriesOf, onOpen }: { attempts: ConsoleAttempt[]; entriesOf: (id: string) => ConsoleEntry[]; onOpen: (id: string) => void }) {
+function HistoryList({
+  attempts,
+  entriesOf,
+  onOpen,
+}: {
+  attempts: ConsoleAttempt[];
+  entriesOf: (id: string) => ConsoleEntry[];
+  onOpen: (id: string) => void;
+}) {
   const removeAttempt = useConsole(s => s.removeAttempt);
   const clear = useConsole(s => s.clear);
-  if (!attempts.length) return <p className="p-8 text-center text-sm text-subtle">No earlier checkouts.</p>;
+  if (!attempts.length)
+    return (
+      <p className="p-8 text-center text-sm text-subtle">
+        No earlier checkouts.
+      </p>
+    );
   return (
     <div>
       <ul className="divide-y">
@@ -121,11 +235,20 @@ function HistoryList({ attempts, entriesOf, onOpen }: { attempts: ConsoleAttempt
           const list = entriesOf(a.id);
           const result = attemptResult(list);
           return (
-            <li key={a.id} className="flex items-center gap-2 px-4 py-3 hover:bg-accent">
-              <button className="min-w-0 flex-1 text-left" onClick={() => onOpen(a.id)}>
-                <span className="block truncate text-sm text-bolder">{a.label}</span>
+            <li
+              key={a.id}
+              className="flex items-center gap-2 px-4 py-3 hover:bg-accent"
+            >
+              <button
+                className="min-w-0 flex-1 text-left"
+                onClick={() => onOpen(a.id)}
+              >
+                <span className="block truncate text-sm text-bolder">
+                  {a.label}
+                </span>
                 <span className="block text-xs text-subtle">
-                  {dayOf(a.startedAt)} {clock(a.startedAt)} · {list.length} {list.length === 1 ? 'activity' : 'activities'}
+                  {dayOf(a.startedAt)} {clock(a.startedAt)} · {list.length}{' '}
+                  {list.length === 1 ? 'activity' : 'activities'}
                   {a.intentIds[0] && ` · ${a.intentIds[0]}`}
                 </span>
               </button>
@@ -152,7 +275,15 @@ function HistoryList({ attempts, entriesOf, onOpen }: { attempts: ConsoleAttempt
 }
 
 /** One checkout's activities, newest last, as a timeline. */
-function CheckoutLog({ attempt, entries, onExport }: { attempt: ConsoleAttempt; entries: ConsoleEntry[]; onExport: () => void }) {
+function CheckoutLog({
+  attempt,
+  entries,
+  onExport,
+}: {
+  attempt: ConsoleAttempt;
+  entries: ConsoleEntry[];
+  onExport: () => void;
+}) {
   const last = useRef<HTMLDivElement>(null);
   const clearEntries = useConsole(s => s.clearEntries);
   const [open, setOpen] = useState<string | null>(null);
@@ -165,7 +296,9 @@ function CheckoutLog({ attempt, entries, onExport }: { attempt: ConsoleAttempt; 
     <div>
       <div className="flex items-center gap-2 border-b px-4 py-2.5">
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm text-bolder">{attempt.label}</span>
+          <span className="block truncate text-sm text-bolder">
+            {attempt.label}
+          </span>
           <span className="block text-xs text-subtle">
             {dayOf(attempt.startedAt)} {clock(attempt.startedAt)}
             {attempt.intentIds.map(id => (
@@ -184,20 +317,39 @@ function CheckoutLog({ attempt, entries, onExport }: { attempt: ConsoleAttempt; 
           </span>
         </span>
         {result && <StatusText {...result} />}
-        <Button variant="ghost" size="icon" aria-label="Export this checkout" title="Export" onClick={onExport} disabled={!entries.length}>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Export this checkout"
+          title="Export"
+          onClick={onExport}
+          disabled={!entries.length}
+        >
           <Download className="size-4" />
         </Button>
-        <Button variant="ghost" size="icon" aria-label="Clear this log" title="Clear log" onClick={() => clearEntries(attempt.id)} disabled={!entries.length}>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Clear this log"
+          title="Clear log"
+          onClick={() => clearEntries(attempt.id)}
+          disabled={!entries.length}
+        >
           <Trash2 className="size-4" />
         </Button>
       </div>
 
       {entries.length === 0 ? (
-        <p className="px-4 py-6 text-sm text-subtle">Waiting for the first activity…</p>
+        <p className="px-4 py-6 text-sm text-subtle">
+          Waiting for the first activity…
+        </p>
       ) : (
         <ol className="relative px-4 py-3">
           {/* The timeline line, as in the dashboard. */}
-          <span className="absolute bottom-6 start-[22px] top-6 w-px bg-border" aria-hidden />
+          <span
+            className="absolute bottom-6 start-[22px] top-6 w-px bg-border"
+            aria-hidden
+          />
           {entries.map((e, i) => (
             <EntryRow
               key={e.id}
@@ -215,7 +367,13 @@ function CheckoutLog({ attempt, entries, onExport }: { attempt: ConsoleAttempt; 
   );
 }
 
-function StatusText({ label, tone }: { label: string; tone: 'ok' | 'bad' | 'pending' | 'neutral' }) {
+function StatusText({
+  label,
+  tone,
+}: {
+  label: string;
+  tone: 'ok' | 'bad' | 'pending' | 'neutral';
+}) {
   return (
     <span
       className={cn(
@@ -231,22 +389,48 @@ function StatusText({ label, tone }: { label: string; tone: 'ok' | 'bad' | 'pend
   );
 }
 
-function attemptResult(entries: ConsoleEntry[]): { label: string; tone: 'ok' | 'bad' | 'pending' | 'neutral' } | null {
-  if (entries.some(e => e.source === 'Webhook' && /successful$|^intent\.processed$/.test(e.title))) return { label: 'Paid', tone: 'ok' };
-  if (entries.some(e => e.source === 'Webhook' && /failed$/.test(e.title))) return { label: 'Failed', tone: 'bad' };
-  if (entries.some(e => e.source === 'Webhook' && /pending_(online_)?external_action$/.test(e.title))) return { label: 'Payment pending', tone: 'pending' };
+function attemptResult(
+  entries: ConsoleEntry[],
+): { label: string; tone: 'ok' | 'bad' | 'pending' | 'neutral' } | null {
+  if (
+    entries.some(
+      e =>
+        e.source === 'Webhook' &&
+        /successful$|^intent\.processed$/.test(e.title),
+    )
+  )
+    return { label: 'Paid', tone: 'ok' };
+  if (entries.some(e => e.source === 'Webhook' && /failed$/.test(e.title)))
+    return { label: 'Failed', tone: 'bad' };
+  if (
+    entries.some(
+      e =>
+        e.source === 'Webhook' &&
+        /pending_(online_)?external_action$/.test(e.title),
+    )
+  )
+    return { label: 'Payment pending', tone: 'pending' };
   if (entries.some(e => !e.ok)) return { label: 'Error', tone: 'bad' };
   return entries.length ? { label: 'In progress', tone: 'neutral' } : null;
 }
 
 /** The status box at the start of a row: HTTP code, or OK / Error for SDK calls, or the webhook label. */
 function StatusBox({ entry }: { entry: ConsoleEntry }) {
-  const text = entry.source === 'Webhook' ? 'Webhook' : entry.status !== undefined ? String(entry.status || 'ERR') : entry.ok ? 'OK' : 'Error';
+  const text =
+    entry.source === 'Webhook'
+      ? 'Webhook'
+      : entry.status !== undefined
+        ? String(entry.status || 'ERR')
+        : entry.ok
+          ? 'OK'
+          : 'Error';
   return (
     <span
       className={cn(
         'shrink-0 rounded border px-1.5 py-0.5 text-[11px] font-medium tabular-nums',
-        entry.ok ? 'border-green-600/40 text-green-700 dark:text-green-400' : 'border-destructive/50 text-destructive',
+        entry.ok
+          ? 'border-green-600/40 text-green-700 dark:text-green-400'
+          : 'border-destructive/50 text-destructive',
       )}
     >
       {text}
@@ -271,29 +455,59 @@ function EntryRow({
 }) {
   const ex = explain(entry, context);
   const next = nextState(entry);
-  const title = entry.source === 'Frontend SDK' ? `moneyHash.${entry.title}()` : entry.title;
-  const hasRequest = entry.request?.body !== undefined && entry.request.body !== null;
+  const title =
+    entry.source === 'Frontend SDK'
+      ? `moneyHash.${entry.title}()`
+      : entry.title;
+  const hasRequest =
+    entry.request?.body !== undefined && entry.request.body !== null;
   const hasHeaders = !!entry.request?.headers;
-  const [tab, setTab] = useState<Tab>(entry.source === 'Webhook' || !hasRequest ? 'response' : 'request');
+  const [tab, setTab] = useState<Tab>(
+    entry.source === 'Webhook' || !hasRequest ? 'response' : 'request',
+  );
 
   return (
     <li className="relative ps-7 pb-3 last:pb-0">
-      <span className={cn('absolute start-[3px] top-4 size-2 rounded-full', entry.ok ? 'bg-subtler' : 'bg-destructive')} aria-hidden />
-      <div className={cn('rounded-md border bg-background', open ? 'border-primary' : 'hover:border-input', !entry.ok && !open && 'border-destructive/40')}>
-        <button className="flex w-full items-start gap-2 p-3 text-left" onClick={onToggle} aria-expanded={open}>
+      <span
+        className={cn(
+          'absolute start-[3px] top-4 size-2 rounded-full',
+          entry.ok ? 'bg-subtler' : 'bg-destructive',
+        )}
+        aria-hidden
+      />
+      <div
+        className={cn(
+          'rounded-md border bg-background',
+          open ? 'border-primary' : 'hover:border-input',
+          !entry.ok && !open && 'border-destructive/40',
+        )}
+      >
+        <button
+          className="flex w-full items-start gap-2 p-3 text-left"
+          onClick={onToggle}
+          aria-expanded={open}
+        >
           <div className="min-w-0 flex-1 space-y-1">
             <div className="flex flex-wrap items-center gap-2">
               <StatusBox entry={entry} />
-              <span className="text-sm font-medium text-bolder [overflow-wrap:anywhere]">{title}</span>
+              <span className="text-sm font-medium text-bolder [overflow-wrap:anywhere]">
+                {title}
+              </span>
             </div>
             <p className="text-xs text-subtle">{SOURCE_HINT[entry.source]}</p>
             <p className="text-xs text-subtler">
               {clock(entry.ts)}
               {after !== null && ` (${gap(after)} after previous activity)`}
-              {entry.latencyMs !== undefined && ` · took ${gap(entry.latencyMs)}`}
+              {entry.latencyMs !== undefined &&
+                ` · took ${gap(entry.latencyMs)}`}
             </p>
           </div>
-          <ChevronRight className={cn('mt-1 size-4 shrink-0 text-subtle transition-transform', open && 'rotate-90')} />
+          <ChevronRight
+            className={cn(
+              'mt-1 size-4 shrink-0 text-subtle transition-transform',
+              open && 'rotate-90',
+            )}
+          />
         </button>
 
         {open && (
@@ -304,21 +518,32 @@ function EntryRow({
             </p>
             {next && (
               <p className="text-xs text-subtle">
-                Next: <span className="font-mono text-bolder">{next.state}</span>
+                Next:{' '}
+                <span className="font-mono text-bolder">{next.state}</span>
                 {next.meaning && ` — ${next.meaning}`}
               </p>
             )}
-            {entry.note && entry.source !== 'Webhook' && <p className="text-xs text-subtle [overflow-wrap:anywhere]">{entry.note}</p>}
+            {entry.note && entry.source !== 'Webhook' && (
+              <p className="text-xs text-subtle [overflow-wrap:anywhere]">
+                {entry.note}
+              </p>
+            )}
             {!entry.ok && ex.fix && (
               <p className="rounded border border-destructive/40 px-3 py-2 text-xs [overflow-wrap:anywhere]">
-                <span className="font-medium text-destructive">What to do: </span>
+                <span className="font-medium text-destructive">
+                  What to do:{' '}
+                </span>
                 {ex.fix}
               </p>
             )}
 
             {(entry.method || entry.endpoint) && (
               <p className="break-all font-mono text-[11px] text-subtle">
-                {entry.method && <span className="me-1 rounded bg-accent px-1 py-0.5 font-semibold text-bolder">{entry.method}</span>}
+                {entry.method && (
+                  <span className="me-1 rounded bg-accent px-1 py-0.5 font-semibold text-bolder">
+                    {entry.method}
+                  </span>
+                )}
                 {entry.endpoint}
               </p>
             )}
@@ -326,12 +551,24 @@ function EntryRow({
             <div className="grid grid-cols-3 gap-1 rounded-md border p-1 text-xs">
               {(
                 [
-                  ['request', entry.source === 'Webhook' ? 'Payload' : 'Request body', hasRequest || entry.source === 'Webhook'],
+                  [
+                    'request',
+                    entry.source === 'Webhook' ? 'Payload' : 'Request body',
+                    hasRequest || entry.source === 'Webhook',
+                  ],
                   ['headers', 'Request headers', hasHeaders],
-                  ['response', entry.source === 'Webhook' ? 'Webhook body' : 'Response body', entry.response !== undefined],
+                  [
+                    'response',
+                    entry.source === 'Webhook'
+                      ? 'Webhook body'
+                      : 'Response body',
+                    entry.response !== undefined,
+                  ],
                 ] as [Tab, string, boolean][]
               )
-                .filter(([id]) => !(entry.source === 'Webhook' && id === 'request'))
+                .filter(
+                  ([id]) => !(entry.source === 'Webhook' && id === 'request'),
+                )
                 .map(([id, label, enabled]) => (
                   <button
                     key={id}
@@ -339,24 +576,49 @@ function EntryRow({
                     onClick={() => setTab(id)}
                     className={cn(
                       'rounded px-2 py-1.5',
-                      tab === id ? 'bg-primary text-primary-foreground' : 'text-subtle hover:bg-accent',
-                      !enabled && 'cursor-not-allowed opacity-40 hover:bg-transparent',
+                      tab === id
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-subtle hover:bg-accent',
+                      !enabled &&
+                        'cursor-not-allowed opacity-40 hover:bg-transparent',
                     )}
                   >
                     {label}
                   </button>
                 ))}
             </div>
-            {tab === 'request' && hasRequest && <Block value={entry.request!.body} />}
-            {tab === 'request' && hasRequest && isCreateIntent(entry) && <ResendEditor body={entry.request!.body} target={{ kind: 'intent' }} />}
-            {tab === 'request' && hasRequest && entry.source === 'Frontend SDK' && EDITABLE_SDK_CALLS.has(entry.title) && (
-              <ResendEditor body={entry.request!.body} target={{ kind: 'sdk', method: entry.title }} />
+            {tab === 'request' && hasRequest && (
+              <Block value={entry.request!.body} />
             )}
-            {tab === 'headers' && hasHeaders && <Block value={entry.request!.headers} />}
-            {tab === 'response' && entry.response !== undefined && <Block value={entry.response} />}
+            {tab === 'request' && hasRequest && isCreateIntent(entry) && (
+              <ResendEditor
+                body={entry.request!.body}
+                target={{ kind: 'intent' }}
+              />
+            )}
+            {tab === 'request' &&
+              hasRequest &&
+              entry.source === 'Frontend SDK' &&
+              EDITABLE_SDK_CALLS.has(entry.title) && (
+                <ResendEditor
+                  body={entry.request!.body}
+                  target={{ kind: 'sdk', method: entry.title }}
+                />
+              )}
+            {tab === 'headers' && hasHeaders && (
+              <Block value={entry.request!.headers} />
+            )}
+            {tab === 'response' && entry.response !== undefined && (
+              <Block value={entry.response} />
+            )}
 
             {ex.docs && (
-              <a href={ex.docs} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+              <a
+                href={ex.docs}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+              >
                 <BookOpen className="size-3.5" /> Docs
               </a>
             )}
@@ -368,7 +630,9 @@ function EntryRow({
 }
 
 /** The request that creates the intent: the one worth editing and sending again. */
-const isCreateIntent = (e: ConsoleEntry) => e.source === 'Backend API' && (e.title === 'Create payment intent' || /: create intent$/.test(e.title));
+const isCreateIntent = (e: ConsoleEntry) =>
+  e.source === 'Backend API' &&
+  (e.title === 'Create payment intent' || /: create intent$/.test(e.title));
 
 /** Tells the payment page to start a fresh attempt (pay-view listens). */
 export const RESTART_EVENT = 'mh:restart-attempt';
@@ -379,26 +643,37 @@ export const RESTART_EVENT = 'mh:restart-attempt';
  * so every later step follows from the edited intent. Only changed fields are kept,
  * so masked values in the log are never sent back.
  */
-function ResendEditor({ body, target }: { body: unknown; target: { kind: 'intent' } | { kind: 'sdk'; method: string } }) {
+function ResendEditor({
+  body,
+  target,
+}: {
+  body: unknown;
+  target: { kind: 'intent' } | { kind: 'sdk'; method: string };
+}) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState(() => JSON.stringify(body, null, 2));
   const [error, setError] = useState<string | null>(null);
   // Only the payment page can start a new attempt.
   const onPayPage = usePathname() === '/checkout/pay';
-  if (!onPayPage || typeof body !== 'object' || !body || Array.isArray(body)) return null;
+  if (!onPayPage || typeof body !== 'object' || !body || Array.isArray(body))
+    return null;
   const original = body as Record<string, unknown>;
 
   function resend() {
     let edited: Record<string, unknown>;
     try {
       edited = JSON.parse(text);
-      if (!edited || typeof edited !== 'object' || Array.isArray(edited)) throw new Error('not an object');
+      if (!edited || typeof edited !== 'object' || Array.isArray(edited))
+        throw new Error('not an object');
     } catch {
       setError('This is not a valid JSON object.');
       return;
     }
     const cfg = useConfig.getState();
-    const current: IntentPatch = target.kind === 'intent' ? cfg.intentPatch : (cfg.sdkEdits?.[target.method] ?? { set: {}, removed: [] });
+    const current: IntentPatch =
+      target.kind === 'intent'
+        ? cfg.intentPatch
+        : (cfg.sdkEdits?.[target.method] ?? { set: {}, removed: [] });
     const set = { ...current.set };
     const removed = new Set(current.removed);
     let changes = 0;
@@ -511,20 +786,35 @@ function Block({ value }: { value: unknown }) {
 }
 
 /** Page layout with the console on the right, or full width when it is hidden. */
-export function WithConsole({ children, narrow = false }: { children: React.ReactNode; narrow?: boolean }) {
+export function WithConsole({
+  children,
+  narrow = false,
+}: {
+  children: React.ReactNode;
+  narrow?: boolean;
+}) {
   const hydrated = useHydrated();
   const show = useConfig(s => s.showConsole);
   if (hydrated && !show) {
     return (
       <>
-        <div className={cn('mx-auto px-4 pt-8 pb-24 sm:px-6 lg:px-8', narrow ? 'max-w-3xl' : 'max-w-5xl')}>{children}</div>
+        <div
+          className={cn(
+            'mx-auto px-4 pt-8 pb-24 sm:px-6 lg:px-8',
+            narrow ? 'max-w-3xl' : 'max-w-5xl',
+          )}
+        >
+          {children}
+        </div>
         <ConsoleOpenTab />
       </>
     );
   }
   return (
     <div className="mx-auto grid max-w-[1600px] gap-6 px-4 pt-8 pb-24 sm:px-6 lg:grid-cols-[minmax(0,1fr)_32rem] lg:px-8">
-      <div className={cn('min-w-0', narrow && 'mx-auto w-full max-w-3xl')}>{children}</div>
+      <div className={cn('min-w-0', narrow && 'mx-auto w-full max-w-3xl')}>
+        {children}
+      </div>
       <ConsolePanel className="h-[70vh] lg:sticky lg:top-[120px] lg:h-[calc(100vh-136px)]" />
     </div>
   );
@@ -533,7 +823,11 @@ export function WithConsole({ children, narrow = false }: { children: React.Reac
 /** Tab on the right edge that brings the console back when it is hidden. */
 export function ConsoleOpenTab() {
   // Calls in the current checkout only.
-  const count = useConsole(s => (s.currentAttemptId ? s.entries.filter(e => e.attemptId === s.currentAttemptId).length : 0));
+  const count = useConsole(s =>
+    s.currentAttemptId
+      ? s.entries.filter(e => e.attemptId === s.currentAttemptId).length
+      : 0,
+  );
   return (
     <button
       onClick={() => useConfig.getState().set({ showConsole: true })}

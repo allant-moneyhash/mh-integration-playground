@@ -1,7 +1,12 @@
 'use client';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { products, type Currency, type Product, CURRENCY_DECIMALS } from '@/lib/catalog';
+import {
+  products,
+  type Currency,
+  type Product,
+  CURRENCY_DECIMALS,
+} from '@/lib/catalog';
 
 type CartState = {
   currency: Currency;
@@ -19,7 +24,10 @@ export const useCart = create<CartState>()(
       currency: 'AED',
       quantities: {},
       setCurrency: currency => set({ currency }),
-      add: id => set(s => ({ quantities: { ...s.quantities, [id]: (s.quantities[id] ?? 0) + 1 } })),
+      add: id =>
+        set(s => ({
+          quantities: { ...s.quantities, [id]: (s.quantities[id] ?? 0) + 1 },
+        })),
       setQuantity: (id, qty) =>
         set(s => {
           const next = { ...s.quantities };
@@ -39,12 +47,23 @@ export const useCart = create<CartState>()(
   ),
 );
 
-export type CartLine = { product: Product; quantity: number; lineTotal: number };
+export type CartLine = {
+  product: Product;
+  quantity: number;
+  lineTotal: number;
+};
 
-export function cartLines(quantities: Record<string, number>, currency: Currency): CartLine[] {
+export function cartLines(
+  quantities: Record<string, number>,
+  currency: Currency,
+): CartLine[] {
   return products
     .filter(p => quantities[p.id])
-    .map(p => ({ product: p, quantity: quantities[p.id], lineTotal: p.price[currency] * quantities[p.id] }));
+    .map(p => ({
+      product: p,
+      quantity: quantities[p.id],
+      lineTotal: p.price[currency] * quantities[p.id],
+    }));
 }
 
 export function cartTotal(lines: CartLine[], currency: Currency) {

@@ -12,7 +12,16 @@ export type OrderSnapshot = {
   currency: Currency;
   total: number;
   customer: Customer;
-  items: { id: string; name: string; color: string; description: string; imageSrc: string; imageAlt: string; quantity: number; lineTotal: number }[];
+  items: {
+    id: string;
+    name: string;
+    color: string;
+    description: string;
+    imageSrc: string;
+    imageAlt: string;
+    quantity: number;
+    lineTotal: number;
+  }[];
 };
 
 type OrdersState = {
@@ -45,6 +54,9 @@ export const useOrders = create<OrdersState>()(
         set(s => ({ snapshots: { ...s.snapshots, [intentId]: snap } }));
       },
     }),
-    { name: 'mh-playground-orders', storage: createJSONStorage(() => sessionStorage) },
+    {
+      name: 'mh-playground-orders',
+      storage: createJSONStorage(() => sessionStorage),
+    },
   ),
 );

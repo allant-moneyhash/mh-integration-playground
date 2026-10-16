@@ -1,30 +1,42 @@
 # MoneyHash Integration Playground
 
-A demo store (styled after shop.moneyhash.io) where you pick an integration type and watch every call
+A demo store, built like [shop.moneyhash.io](https://shop.moneyhash.io), where you pick an integration
+(Payment, External or Direct API; JS SDK, hosted page or your own checkout) and watch every call
 between the store, MoneyHash and the webhook inbox in a live console.
+
+### [Open the playground](https://mh-integration-playground.vercel.app) · [MoneyHash docs](https://docs.moneyhash.io)
+
+## Installing
+
+```shell
+npm install @moneyhash/js-sdk
+```
 
 ## Run locally
 
-```bash
+```shell
 npm install
 cp .env.example .env.local   # fill in test-mode keys
 npm run dev
 ```
+
+Code style follows shop.moneyhash.io: Prettier (`npm run prettier:check`), EditorConfig, Node from `.nvmrc`,
+and conventional commit messages (`feat: …`, `fix: …`, `chore: …`), checked by `.githooks/commit-msg`.
 
 Without keys in `.env.local`, paste test keys into **Config** in the UI (kept for the tab, or saved with a preset in your browser only).
 Webhooks can't reach `localhost`; deploy to Vercel (or use a tunnel) to see them in the console.
 
 ## How it is put together
 
-| Path | What it does |
-| --- | --- |
-| `src/app/api/mh/*` | Server routes. The only code that holds secret keys and calls MoneyHash (fixed hosts). |
-| `src/lib/server/mh.ts` | MoneyHash client, key resolution, live-key guard, masked console entries. |
-| `src/app/api/webhooks` | Webhook receiver (`MoneyHash-Signature` v3 check) and the inbox the console polls. |
-| `src/flows/*` | One folder per integration flow, all implementing `IntegrationFlow`. |
-| `src/flows/session.ts` | The only place that reads the "Use intent secret" switch. |
-| `src/lib/embed-options.ts` | Embed customisation options as data. |
-| `src/lib/mask.ts` | Masking used by the server, the console and exports. |
+| Path                       | What it does                                                                           |
+| -------------------------- | -------------------------------------------------------------------------------------- |
+| `src/app/api/mh/*`         | Server routes. The only code that holds secret keys and calls MoneyHash (fixed hosts). |
+| `src/lib/server/mh.ts`     | MoneyHash client, key resolution, live-key guard, masked console entries.              |
+| `src/app/api/webhooks`     | Webhook receiver (`MoneyHash-Signature` v3 check) and the inbox the console polls.     |
+| `src/flows/*`              | One folder per integration flow, all implementing `IntegrationFlow`.                   |
+| `src/flows/session.ts`     | The only place that reads the "Use intent secret" switch.                              |
+| `src/lib/embed-options.ts` | Embed customisation options as data.                                                   |
+| `src/lib/mask.ts`          | Masking used by the server, the console and exports.                                   |
 
 ## Add a flow
 

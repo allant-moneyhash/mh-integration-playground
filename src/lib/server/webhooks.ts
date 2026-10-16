@@ -31,7 +31,11 @@ const SIGNING_KEY_NAME: Record<EnvId, string> = {
  * MoneyHash-Signature: t=<ts>,v1=..,v2=..,v3=..
  * v3 = hex(HMAC-SHA256(key, base64(rawBody) + t))
  */
-export function verifySignature(rawBody: string, header: string | null, env: EnvId): SignatureCheck {
+export function verifySignature(
+  rawBody: string,
+  header: string | null,
+  env: EnvId,
+): SignatureCheck {
   const key = process.env[SIGNING_KEY_NAME[env]];
   if (!key || !header) return 'not checked';
   const parts = Object.fromEntries(
@@ -51,8 +55,16 @@ export function verifySignature(rawBody: string, header: string | null, env: Env
 
 function findIntentId(payload: Record<string, unknown>): string | null {
   const data = (payload.data ?? {}) as Record<string, unknown>;
-  const intent = (data.intent ?? payload.intent ?? {}) as Record<string, unknown>;
-  const candidates = [intent.id, payload.intent_id, data.intent_id, data.object === 'intent' ? data.id : undefined];
+  const intent = (data.intent ?? payload.intent ?? {}) as Record<
+    string,
+    unknown
+  >;
+  const candidates = [
+    intent.id,
+    payload.intent_id,
+    data.intent_id,
+    data.object === 'intent' ? data.id : undefined,
+  ];
   const hit = candidates.find(c => typeof c === 'string' && c.length > 0);
   return (hit as string) ?? null;
 }
@@ -65,7 +77,11 @@ export function parseWebhook(raw: string): Record<string, unknown> {
   }
 }
 
-export function toStored(payload: Record<string, unknown>, env: EnvId, signature: SignatureCheck): StoredWebhook {
+export function toStored(
+  payload: Record<string, unknown>,
+  env: EnvId,
+  signature: SignatureCheck,
+): StoredWebhook {
   return {
     id: randomUUID(),
     receivedAt: Date.now(),
@@ -84,7 +100,9 @@ export function toStored(payload: Record<string, unknown>, env: EnvId, signature
 const blobEnabled = () => Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 const prefixFor = (intentId: string) => `wh/${intentId}/`;
 
-const g = globalThis as unknown as { __mhWebhookLog?: Map<string, { path: string; event: StoredWebhook }[]> };
+const g = globalThis as unknown as {
+  __mhWebhookLog?: Map<string, { path: string; event: StoredWebhook }[]>;
+};
 const memory = (g.__mhWebhookLog ??= new Map());
 
 export function storageMode() {
@@ -118,7 +136,9 @@ export async function readWebhooks(intentId: string, after: string | null) {
     entries = memory.get(intentId) ?? [];
   } else {
     const { blobs } = await list({ prefix: prefixFor(intentId), limit: 100 });
-    entries = blobs.map(b => ({ path: b.pathname })).sort((a, b) => a.path.localeCompare(b.path));
+    entries = blobs
+      .map(b => ({ path: b.pathname }))
+      .sort((a, b) => a.path.localeCompare(b.path));
   }
   const fresh = entries.filter(e => !after || e.path > after);
   const events = await Promise.all(

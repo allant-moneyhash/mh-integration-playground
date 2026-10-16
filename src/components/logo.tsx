@@ -1,7 +1,10 @@
 import { cn } from '@/lib/cn';
 
 // MoneyHash mark, as on shop.moneyhash.io.
-export function MoneyHashLogo({ className, ...props }: React.SVGProps<SVGSVGElement>) {
+export function MoneyHashLogo({
+  className,
+  ...props
+}: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

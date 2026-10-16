@@ -4,11 +4,18 @@ import dynamic from 'next/dynamic';
 import { useTheme } from 'next-themes';
 import { RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { diffToPatch, patchIsEmpty, type IntentBody, type IntentPatch } from '@/lib/intent-body';
+import {
+  diffToPatch,
+  patchIsEmpty,
+  type IntentBody,
+  type IntentPatch,
+} from '@/lib/intent-body';
 
 const Editor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
-  loading: () => <div className="h-[420px] animate-pulse rounded-md bg-muted" />,
+  loading: () => (
+    <div className="h-[420px] animate-pulse rounded-md bg-muted" />
+  ),
 });
 
 function normalise(json: string) {
@@ -31,7 +38,13 @@ type Props = {
  * Shows the exact intent request that will be sent. Edits are kept as a patch
  * on top of the generated body, so cart and option changes still flow in.
  */
-export function IntentEditor({ generated, final, patch, onPatch, onValidity }: Props) {
+export function IntentEditor({
+  generated,
+  final,
+  patch,
+  onPatch,
+  onValidity,
+}: Props) {
   const { resolvedTheme } = useTheme();
   const finalJson = useMemo(() => JSON.stringify(final, null, 2), [final]);
   const [text, setText] = useState(finalJson);
@@ -50,7 +63,8 @@ export function IntentEditor({ generated, final, patch, onPatch, onValidity }: P
     setText(next);
     try {
       const parsed = JSON.parse(next);
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('The request must be a JSON object.');
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+        throw new Error('The request must be a JSON object.');
       setError(null);
       onValidity(true);
       onPatch(diffToPatch(generated, parsed));
@@ -64,7 +78,9 @@ export function IntentEditor({ generated, final, patch, onPatch, onValidity }: P
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <p className="text-xs text-subtle">
-          This is exactly what your backend sends to <code className="font-mono">POST /payments/intent/</code>. Edit freely.
+          This is exactly what your backend sends to{' '}
+          <code className="font-mono">POST /payments/intent/</code>. Edit
+          freely.
         </p>
         <Button
           variant="ghost"
@@ -87,13 +103,23 @@ export function IntentEditor({ generated, final, patch, onPatch, onValidity }: P
           value={text}
           onChange={onChange}
           theme={resolvedTheme === 'dark' ? 'vs-dark' : 'light'}
-          options={{ minimap: { enabled: false }, fontSize: 12, scrollBeyondLastLine: false, tabSize: 2, wordWrap: 'on' }}
+          options={{
+            minimap: { enabled: false },
+            fontSize: 12,
+            scrollBeyondLastLine: false,
+            tabSize: 2,
+            wordWrap: 'on',
+          }}
         />
       </div>
       {error && <p className="text-xs text-destructive">JSON error: {error}</p>}
       {!patchIsEmpty(patch) && !error && (
         <p className="text-xs text-subtle">
-          Hand edits active on: {[...Object.keys(patch.set), ...patch.removed.map(k => `${k} (removed)`)].join(', ')}
+          Hand edits active on:{' '}
+          {[
+            ...Object.keys(patch.set),
+            ...patch.removed.map(k => `${k} (removed)`),
+          ].join(', ')}
         </p>
       )}
     </div>

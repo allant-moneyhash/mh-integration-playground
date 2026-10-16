@@ -22,7 +22,8 @@ const SENSITIVE_KEYS = new Set([
   'receipt',
 ]);
 
-const QUERY_SECRETS = /([?&](?:mh_intent_secret|intent_secret|token|access_token)=)[^&#\s"]+/gi;
+const QUERY_SECRETS =
+  /([?&](?:mh_intent_secret|intent_secret|token|access_token)=)[^&#\s"]+/gi;
 const JWT = /\beyJ[\w-]+\.[\w-]+\.[\w-]+\b/g;
 const PAN = /^\d{12,19}$/;
 
@@ -50,16 +51,26 @@ function maskString(s: string): string {
  * digit strings like card numbers but the customer needs them, so they are not
  * PAN-masked. Secrets and tokens are still masked inside them.
  */
-const REFERENCE_KEY = /invoice|bill|reference|rrn|voucher|order_?(id|number)|provider_transaction_fields/i;
+const REFERENCE_KEY =
+  /invoice|bill|reference|rrn|voucher|order_?(id|number)|provider_transaction_fields/i;
 
 export function maskDeep<T>(value: T, depth = 0, isReference = false): T {
   if (depth > 25) return value;
-  if (typeof value === 'string') return (isReference ? value.replace(QUERY_SECRETS, '$1••••').replace(JWT, 'eyJ••••') : maskString(value)) as T;
-  if (Array.isArray(value)) return value.map(v => maskDeep(v, depth + 1, isReference)) as T;
+  if (typeof value === 'string')
+    return (
+      isReference
+        ? value.replace(QUERY_SECRETS, '$1••••').replace(JWT, 'eyJ••••')
+        : maskString(value)
+    ) as T;
+  if (Array.isArray(value))
+    return value.map(v => maskDeep(v, depth + 1, isReference)) as T;
   if (value && typeof value === 'object') {
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      if (isSensitiveKey(k) && (typeof v === 'string' || typeof v === 'number')) {
+      if (
+        isSensitiveKey(k) &&
+        (typeof v === 'string' || typeof v === 'number')
+      ) {
         out[k] = maskSecret(String(v));
       } else if (normalise(k) === 'cardnumber' && typeof v === 'string') {
         out[k] = `••••${v.replace(/\s/g, '').slice(-4)}`;

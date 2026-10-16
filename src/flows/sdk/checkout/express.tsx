@@ -11,8 +11,10 @@ import type { Sdk } from '../runtime';
 /** One height for every wallet button (Apple ≥30pt, Google ≥40px, Samsung: unscaled artwork). */
 const BUTTON_HEIGHT = 44;
 
-const APPLE_PAY_SDK ='https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js';
-const SAMSUNG_PAY_SDK = 'https://img.mpay.samsung.com/gsmpi/sdk/samsungpay_web_sdk.js';
+const APPLE_PAY_SDK =
+  'https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js';
+const SAMSUNG_PAY_SDK =
+  'https://img.mpay.samsung.com/gsmpi/sdk/samsungpay_web_sdk.js';
 
 const scripts = new Map<string, Promise<void>>();
 function loadScript(src: string) {
@@ -36,10 +38,16 @@ function loadScript(src: string) {
  * Called with the wallet receipt. Resolves when the payment was submitted;
  * rejects on failure (so the wallet sheet can show an error).
  */
-export type OnReceipt = (methodId: string, receipt: NativeReceiptData) => Promise<void>;
+export type OnReceipt = (
+  methodId: string,
+  receipt: NativeReceiptData,
+) => Promise<void>;
 
 /** Apple Pay merchant validation: the SDK's validateApplePayMerchantSession, or your server (External/Direct API). */
-export type ValidateApplePay = (methodId: string, validationUrl: string) => Promise<unknown>;
+export type ValidateApplePay = (
+  methodId: string,
+  validationUrl: string,
+) => Promise<unknown>;
 
 export function ExpressCheckout({
   methods,
@@ -55,19 +63,43 @@ export function ExpressCheckout({
   validateApplePay?: ValidateApplePay;
 }) {
   const validate: ValidateApplePay | undefined =
-    validateApplePay ?? (sdk ? (methodId, validationUrl) => sdk.validateApplePayMerchantSession({ methodId, validationUrl }) : undefined);
-  const shown = methods.filter(m => ['GOOGLE_PAY', 'APPLE_PAY', 'SAMSUNG_PAY'].includes(m.id) && m.nativePayData);
+    validateApplePay ??
+    (sdk
+      ? (methodId, validationUrl) =>
+          sdk.validateApplePayMerchantSession({ methodId, validationUrl })
+      : undefined);
+  const shown = methods.filter(
+    m =>
+      ['GOOGLE_PAY', 'APPLE_PAY', 'SAMSUNG_PAY'].includes(m.id) &&
+      m.nativePayData,
+  );
   if (!shown.length) return null;
   return (
     <div className="relative grid grid-cols-1 gap-3 rounded border p-4 pt-8">
-      <p className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 bg-background px-2 text-sm text-bolder">Express checkout</p>
+      <p className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 bg-background px-2 text-sm text-bolder">
+        Express checkout
+      </p>
       {shown.map(m =>
         m.id === 'GOOGLE_PAY' ? (
-          <GooglePay key={m.id} data={m.nativePayData!} live={live} onReceipt={r => onReceipt(m.id, r)} />
+          <GooglePay
+            key={m.id}
+            data={m.nativePayData!}
+            live={live}
+            onReceipt={r => onReceipt(m.id, r)}
+          />
         ) : m.id === 'APPLE_PAY' ? (
-          <ApplePay key={m.id} data={m.nativePayData!} validate={validate} onReceipt={r => onReceipt(m.id, r)} />
+          <ApplePay
+            key={m.id}
+            data={m.nativePayData!}
+            validate={validate}
+            onReceipt={r => onReceipt(m.id, r)}
+          />
         ) : (
-          <SamsungPay key={m.id} data={m.nativePayData!} onReceipt={r => onReceipt(m.id, r)} />
+          <SamsungPay
+            key={m.id}
+            data={m.nativePayData!}
+            onReceipt={r => onReceipt(m.id, r)}
+          />
         ),
       )}
     </div>
@@ -77,14 +109,28 @@ export function ExpressCheckout({
 type NativeData = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 function Unavailable({ text }: { text: string }) {
-  return <p className="rounded-sm border border-dashed px-3 py-2 text-center text-xs text-subtle">{text}</p>;
+  return (
+    <p className="rounded-sm border border-dashed px-3 py-2 text-center text-xs text-subtle">
+      {text}
+    </p>
+  );
 }
 
 /** Google's official button (@google-pay/button-react), configured from nativePayData. */
-function GooglePay({ data, live, onReceipt }: { data: NativeData; live: boolean; onReceipt: (r: NativeReceiptData) => Promise<void> }) {
+function GooglePay({
+  data,
+  live,
+  onReceipt,
+}: {
+  data: NativeData;
+  live: boolean;
+  onReceipt: (r: NativeReceiptData) => Promise<void>;
+}) {
   return (
     <GooglePayButton
-      environment={data.environment === 'PRODUCTION' || live ? 'PRODUCTION' : 'TEST'}
+      environment={
+        data.environment === 'PRODUCTION' || live ? 'PRODUCTION' : 'TEST'
+      }
       buttonColor="black"
       buttonType="pay"
       buttonSizeMode="fill"
@@ -98,17 +144,29 @@ function GooglePay({ data, live, onReceipt }: { data: NativeData; live: boolean;
           {
             type: 'CARD',
             parameters: {
-              allowedAuthMethods: data.allowed_card_auth_methods ?? ['PAN_ONLY', 'CRYPTOGRAM_3DS'],
-              allowedCardNetworks: data.allowed_card_networks ?? ['MASTERCARD', 'VISA'],
+              allowedAuthMethods: data.allowed_card_auth_methods ?? [
+                'PAN_ONLY',
+                'CRYPTOGRAM_3DS',
+              ],
+              allowedCardNetworks: data.allowed_card_networks ?? [
+                'MASTERCARD',
+                'VISA',
+              ],
               billingAddressRequired: true,
             },
             tokenizationSpecification: {
               type: 'PAYMENT_GATEWAY',
-              parameters: { gateway: data.gateway, gatewayMerchantId: data.gateway_merchant_id },
+              parameters: {
+                gateway: data.gateway,
+                gatewayMerchantId: data.gateway_merchant_id,
+              },
             },
           },
         ],
-        merchantInfo: { merchantId: data.merchant_id, merchantName: data.merchant_name },
+        merchantInfo: {
+          merchantId: data.merchant_id,
+          merchantName: data.merchant_name,
+        },
         transactionInfo: {
           totalPriceStatus: 'FINAL',
           totalPriceLabel: 'Total',
@@ -129,13 +187,26 @@ function GooglePay({ data, live, onReceipt }: { data: NativeData; live: boolean;
 }
 
 /** Apple's official <apple-pay-button>; ApplePaySession with merchant validation through MoneyHash. */
-function ApplePay({ data, validate, onReceipt }: { data: NativeData; validate?: ValidateApplePay; onReceipt: (r: NativeReceiptData) => Promise<void> }) {
+function ApplePay({
+  data,
+  validate,
+  onReceipt,
+}: {
+  data: NativeData;
+  validate?: ValidateApplePay;
+  onReceipt: (r: NativeReceiptData) => Promise<void>;
+}) {
   const [ready, setReady] = useState<boolean | null>(null);
   const holder = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadScript(APPLE_PAY_SDK)
-      .then(() => setReady(typeof window.ApplePaySession !== 'undefined' && window.ApplePaySession.canMakePayments()))
+      .then(() =>
+        setReady(
+          typeof window.ApplePaySession !== 'undefined' &&
+            window.ApplePaySession.canMakePayments(),
+        ),
+      )
       .catch(() => setReady(false));
   }, []);
 
@@ -148,7 +219,11 @@ function ApplePay({ data, validate, onReceipt }: { data: NativeData; validate?: 
         currencyCode: data.currency_code,
         supportedNetworks: data.supported_networks,
         merchantCapabilities: data.supported_capabilities ?? ['supports3DS'],
-        total: { label: data.merchant_name ?? 'Total', type: 'final', amount: `${data.amount}` },
+        total: {
+          label: data.merchant_name ?? 'Total',
+          type: 'final',
+          amount: `${data.amount}`,
+        },
         requiredShippingContactFields: ['email'],
       });
       session.onvalidatemerchant = e => {
@@ -161,7 +236,9 @@ function ApplePay({ data, validate, onReceipt }: { data: NativeData; validate?: 
         try {
           await onReceipt({
             receipt: JSON.stringify({ token: e.payment.token }),
-            receiptBillingData: { email: e.payment.shippingContact?.emailAddress ?? '' },
+            receiptBillingData: {
+              email: e.payment.shippingContact?.emailAddress ?? '',
+            },
           });
           session.completePayment(window.ApplePaySession.STATUS_SUCCESS);
         } catch {
@@ -174,8 +251,12 @@ function ApplePay({ data, validate, onReceipt }: { data: NativeData; validate?: 
     return () => el.removeEventListener('click', start);
   }, [ready, data, validate, onReceipt]);
 
-  if (ready === null) return <div className="h-11 animate-pulse rounded-sm bg-muted" />;
-  if (!ready) return <Unavailable text="Apple Pay shows in Safari on an Apple device with a card in Wallet, on a domain registered for Apple Pay." />;
+  if (ready === null)
+    return <div className="h-11 animate-pulse rounded-sm bg-muted" />;
+  if (!ready)
+    return (
+      <Unavailable text="Apple Pay shows in Safari on an Apple device with a card in Wallet, on a domain registered for Apple Pay." />
+    );
   return (
     <div ref={holder}>
       {/* Apple's official web component (apple-pay-sdk.js), sized through its CSS variables. */}
@@ -199,15 +280,30 @@ function ApplePay({ data, validate, onReceipt }: { data: NativeData; validate?: 
 
 type SamsungClient = {
   isReadyToPay: (m: Record<string, unknown>) => Promise<{ result: boolean }>;
-  createButton: (o: { onClick: () => void; buttonStyle: string; type: string }) => HTMLElement;
-  loadPaymentSheet: (m: Record<string, unknown>, t: Record<string, unknown>) => Promise<unknown>;
+  createButton: (o: {
+    onClick: () => void;
+    buttonStyle: string;
+    type: string;
+  }) => HTMLElement;
+  loadPaymentSheet: (
+    m: Record<string, unknown>,
+    t: Record<string, unknown>,
+  ) => Promise<unknown>;
   notify: (o: Record<string, unknown>) => void;
 };
 
 /** Samsung's web SDK button, as in the shop's samsung-pay.tsx. */
-function SamsungPay({ data, onReceipt }: { data: NativeData; onReceipt: (r: NativeReceiptData) => Promise<void> }) {
+function SamsungPay({
+  data,
+  onReceipt,
+}: {
+  data: NativeData;
+  onReceipt: (r: NativeReceiptData) => Promise<void>;
+}) {
   const holder = useRef<HTMLDivElement>(null);
-  const [state, setState] = useState<'loading' | 'ready' | 'unavailable'>('loading');
+  const [state, setState] = useState<'loading' | 'ready' | 'unavailable'>(
+    'loading',
+  );
 
   useEffect(() => {
     const container = holder.current;
@@ -222,14 +318,31 @@ function SamsungPay({ data, onReceipt }: { data: NativeData; onReceipt: (r: Nati
     };
     const transactionDetail = {
       orderNumber: data.trx_uuid,
-      merchant: { name: data.merchant_name, url: window.location.hostname, id: data.merchant_id, countryCode: data.country_code },
-      amount: { option: 'FORMAT_TOTAL_ESTIMATED_AMOUNT', currency: data.currency_code, total: data.amount },
+      merchant: {
+        name: data.merchant_name,
+        url: window.location.hostname,
+        id: data.merchant_id,
+        countryCode: data.country_code,
+      },
+      amount: {
+        option: 'FORMAT_TOTAL_ESTIMATED_AMOUNT',
+        currency: data.currency_code,
+        total: data.amount,
+      },
     };
     loadScript(SAMSUNG_PAY_SDK)
       .then(async () => {
-        const SP = (window as unknown as { SamsungPay?: { PaymentClient: new (o: { environment: string }) => SamsungClient } }).SamsungPay;
+        const SP = (
+          window as unknown as {
+            SamsungPay?: {
+              PaymentClient: new (o: { environment: string }) => SamsungClient;
+            };
+          }
+        ).SamsungPay;
         if (!SP) throw new Error('no sdk');
-        const client = new SP.PaymentClient({ environment: data.environment ?? 'STAGE' });
+        const client = new SP.PaymentClient({
+          environment: data.environment ?? 'STAGE',
+        });
         const ready = await client.isReadyToPay(paymentMethods);
         if (cancelled) return;
         if (!ready?.result) return setState('unavailable');
@@ -238,8 +351,13 @@ function SamsungPay({ data, onReceipt }: { data: NativeData; onReceipt: (r: Nati
           type: 'buy',
           onClick: async () => {
             try {
-              const credential = await client.loadPaymentSheet(paymentMethods, transactionDetail);
-              await onReceipt({ receipt: JSON.stringify(credential) } as NativeReceiptData);
+              const credential = await client.loadPaymentSheet(
+                paymentMethods,
+                transactionDetail,
+              );
+              await onReceipt({
+                receipt: JSON.stringify(credential),
+              } as NativeReceiptData);
               client.notify({ status: 'CHARGED' });
             } catch {
               client.notify({ status: 'ERRED', provider: 'MoneyHash' });
@@ -268,8 +386,12 @@ function SamsungPay({ data, onReceipt }: { data: NativeData; onReceipt: (r: Nati
           state !== 'ready' && 'hidden',
         )}
       />
-      {state === 'loading' && <div className="h-11 animate-pulse rounded-sm bg-muted" />}
-      {state === 'unavailable' && <Unavailable text="Samsung Pay shows on Samsung devices/browsers where Samsung Pay is set up." />}
+      {state === 'loading' && (
+        <div className="h-11 animate-pulse rounded-sm bg-muted" />
+      )}
+      {state === 'unavailable' && (
+        <Unavailable text="Samsung Pay shows on Samsung devices/browsers where Samsung Pay is set up." />
+      )}
     </div>
   );
 }
@@ -281,7 +403,10 @@ declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace React.JSX {
     interface IntrinsicElements {
-      'apple-pay-button': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement> & {
+      'apple-pay-button': React.DetailedHTMLProps<
+        React.HTMLAttributes<HTMLElement>,
+        HTMLElement
+      > & {
         buttonstyle?: string;
         type?: string;
         locale?: string;

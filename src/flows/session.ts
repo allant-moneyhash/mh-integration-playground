@@ -34,14 +34,22 @@ export function resolveSession(
   };
 }
 
-type IntentData = { id?: string; embed_url?: string; intent_secret?: string; state_details?: { embed_url?: string } };
+type IntentData = {
+  id?: string;
+  embed_url?: string;
+  intent_secret?: string;
+  state_details?: { embed_url?: string };
+};
 
 /**
  * The embed URL to load. Secret on: use it as MoneyHash returned it (it carries
  * mh_intent_secret). Secret off: the same URL without the secret.
  */
 export function embedUrlFor(session: Session, intent: IntentData): string {
-  const raw = intent.embed_url ?? intent.state_details?.embed_url ?? `${session.embedHost}/embed/payment/${intent.id}`;
+  const raw =
+    intent.embed_url ??
+    intent.state_details?.embed_url ??
+    `${session.embedHost}/embed/payment/${intent.id}`;
   const url = new URL(raw);
   if (session.useIntentSecret) {
     if (!url.searchParams.get('mh_intent_secret') && intent.intent_secret) {

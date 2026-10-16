@@ -20,7 +20,14 @@ export function useCheckoutSetup() {
   const session = useMemo(
     () => resolveSession(cfg, keys),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [cfg.env, cfg.apiVersion, cfg.useIntentSecret, cfg.embedOptions, keys.apiKey, keys.publicApiKey],
+    [
+      cfg.env,
+      cfg.apiVersion,
+      cfg.useIntentSecret,
+      cfg.embedOptions,
+      keys.apiKey,
+      keys.publicApiKey,
+    ],
   );
 
   const generated = useMemo(
@@ -33,12 +40,40 @@ export function useCheckoutSetup() {
         options: cfg.embedOptions,
         origin: window.location.origin,
         env: cfg.env,
-        flowFields: { ...flow.intentFields?.(session), ...(cfg.paymentFlowId.trim() ? { flow_id: cfg.paymentFlowId.trim() } : {}) },
+        flowFields: {
+          ...flow.intentFields?.(session),
+          ...(cfg.paymentFlowId.trim()
+            ? { flow_id: cfg.paymentFlowId.trim() }
+            : {}),
+        },
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [quantities, currency, cfg.customer, cfg.embedOptions, cfg.env, cfg.paymentFlowId, flow.id, session],
+    [
+      quantities,
+      currency,
+      cfg.customer,
+      cfg.embedOptions,
+      cfg.env,
+      cfg.paymentFlowId,
+      flow.id,
+      session,
+    ],
   );
-  const final = useMemo(() => applyPatch(generated, cfg.intentPatch), [generated, cfg.intentPatch]);
+  const final = useMemo(
+    () => applyPatch(generated, cfg.intentPatch),
+    [generated, cfg.intentPatch],
+  );
 
-  return { cfg, keys, lines, total, currency, setCurrency, flow, session, generated, final };
+  return {
+    cfg,
+    keys,
+    lines,
+    total,
+    currency,
+    setCurrency,
+    flow,
+    session,
+    generated,
+    final,
+  };
 }

@@ -50,7 +50,8 @@ function Checkout({ intentBody, session }: FlowCheckoutProps) {
           className="h-[700px] w-full rounded-md border bg-background"
         />
         <p className="text-xs text-subtle">
-          When MoneyHash sends the final webhook, your backend updates the order and this page moves on by itself.
+          When MoneyHash sends the final webhook, your backend updates the order
+          and this page moves on by itself.
         </p>
       </div>
     );
@@ -80,17 +81,33 @@ export const embedIframeFlow: IntegrationFlow = {
   api: 'payment',
   category: 'hosted',
   label: 'Embed in iframe',
-  summary: 'Your server creates the intent; MoneyHash checkout loads inside an iframe on your page.',
+  summary:
+    'Your server creates the intent; MoneyHash checkout loads inside an iframe on your page.',
   ready: true,
   usesEmbedUrl: true,
   // In an iframe, keep 3DS and provider pages inside the embed instead of a new tab
   // (the account default). "Redirect strategy" in the embed options overrides it.
   intentFields: () => ({ redirect_strategy: 'redirect_inside_embed' }),
   steps: session => [
-    { source: 'Backend API', label: 'POST /payments/intent/ (create intent, returns embed_url)' },
-    { source: 'Frontend', label: 'Load embed_url in an <iframe>', secret: embedSecretNote(session) },
-    { source: 'Webhook', label: 'MoneyHash posts transaction and intent webhooks to your backend, which updates the order' },
-    { source: 'Frontend', label: 'Order turns final from the webhook, so the store redirects to the order page' },
+    {
+      source: 'Backend API',
+      label: 'POST /payments/intent/ (create intent, returns embed_url)',
+    },
+    {
+      source: 'Frontend',
+      label: 'Load embed_url in an <iframe>',
+      secret: embedSecretNote(session),
+    },
+    {
+      source: 'Webhook',
+      label:
+        'MoneyHash posts transaction and intent webhooks to your backend, which updates the order',
+    },
+    {
+      source: 'Frontend',
+      label:
+        'Order turns final from the webhook, so the store redirects to the order page',
+    },
   ],
   Checkout,
 };

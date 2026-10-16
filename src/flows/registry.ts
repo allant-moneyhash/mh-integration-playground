@@ -8,7 +8,12 @@ import { sdkRenderFormFlow } from './sdk-render-form';
 import { sdkIntentFirstFlow } from './sdk-intent-first';
 import { sdkMethodsFirstFlow } from './sdk-methods-first';
 import { sdkCardFirstFlow } from './sdk-card-first';
-import { mitFlow, serverCheckoutFlow, serverHostedFlow, serverRenderFormFlow } from './server-driven';
+import {
+  mitFlow,
+  serverCheckoutFlow,
+  serverHostedFlow,
+  serverRenderFormFlow,
+} from './server-driven';
 import { normalise, type Selection } from './selection';
 import type { IntegrationFlow } from './types';
 
@@ -16,9 +21,14 @@ function base(sel: Selection): IntegrationFlow {
   const { api, experience, settings } = sel;
   if (api === 'payment') {
     if (experience === 'checkout')
-      return settings.intentTiming === 'intent-first' ? sdkIntentFirstFlow : settings.intentTiming === 'card-first' ? sdkCardFirstFlow : sdkMethodsFirstFlow;
+      return settings.intentTiming === 'intent-first'
+        ? sdkIntentFirstFlow
+        : settings.intentTiming === 'card-first'
+          ? sdkCardFirstFlow
+          : sdkMethodsFirstFlow;
     if (experience === 'form') return sdkRenderFormFlow;
-    if (experience === 'hosted') return settings.hosted === 'iframe' ? embedIframeFlow : embedRedirectFlow;
+    if (experience === 'hosted')
+      return settings.hosted === 'iframe' ? embedIframeFlow : embedRedirectFlow;
     return mitFlow('payment');
   }
   if (experience === 'checkout') return serverCheckoutFlow(api, settings);

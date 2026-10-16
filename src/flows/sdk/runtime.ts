@@ -41,13 +41,19 @@ function pointAt(env: EnvId) {
 async function resolvePublicKey(session: Session): Promise<string> {
   if (session.publicApiKey) return session.publicApiKey;
   try {
-    const res = await fetch(`/api/public-config?env=${session.env}`, { cache: 'no-store' });
-    const { publicApiKey } = (await res.json()) as { publicApiKey: string | null };
+    const res = await fetch(`/api/public-config?env=${session.env}`, {
+      cache: 'no-store',
+    });
+    const { publicApiKey } = (await res.json()) as {
+      publicApiKey: string | null;
+    };
     if (publicApiKey) return publicApiKey;
   } catch {
     // fall through
   }
-  throw new Error('No public API key. Add your public key in Config (top right). Demo keys are not set on this deployment yet.');
+  throw new Error(
+    'No public API key. Add your public key in Config (top right). Demo keys are not set on this deployment yet.',
+  );
 }
 
 /** SDK methods we log. Anything else (elements, listeners) is UI plumbing. */
@@ -86,7 +92,13 @@ function takeNote(method: string) {
   return note;
 }
 
-function logCall(name: string, args: unknown[], started: number, result: { ok: boolean; value: unknown }, note?: string) {
+function logCall(
+  name: string,
+  args: unknown[],
+  started: number,
+  result: { ok: boolean; value: unknown },
+  note?: string,
+) {
   useConsole.getState().add({
     ...(note ? { note } : {}),
     id: newId(),
@@ -103,7 +115,14 @@ function logCall(name: string, args: unknown[], started: number, result: { ok: b
 }
 
 /** SDK calls whose options object can be edited from the console and sent again. */
-export const EDITABLE_SDK_CALLS = new Set(['getMethods', 'proceedWith', 'submitForm', 'cardForm.pay', 'getInstallmentPlans', 'selectInstallmentPlan']);
+export const EDITABLE_SDK_CALLS = new Set([
+  'getMethods',
+  'proceedWith',
+  'submitForm',
+  'cardForm.pay',
+  'getInstallmentPlans',
+  'selectInstallmentPlan',
+]);
 
 /** The console's edits for an SDK method, if any. */
 export function sdkEditsFor(name: string) {
@@ -112,19 +131,43 @@ export function sdkEditsFor(name: string) {
 }
 
 /** Applies the console's edits for this method to its options object; returns the fields changed. */
-function withEdits(name: string, args: unknown[]): { args: unknown[]; changed: string[] } {
+function withEdits(
+  name: string,
+  args: unknown[],
+): { args: unknown[]; changed: string[] } {
   const p = sdkEditsFor(name);
   const first = args[0];
-  if (!p || !EDITABLE_SDK_CALLS.has(name) || !first || typeof first !== 'object' || Array.isArray(first)) return { args, changed: [] };
-  const out: Record<string, unknown> = { ...(first as Record<string, unknown>), ...p.set };
+  if (
+    !p ||
+    !EDITABLE_SDK_CALLS.has(name) ||
+    !first ||
+    typeof first !== 'object' ||
+    Array.isArray(first)
+  )
+    return { args, changed: [] };
+  const out: Record<string, unknown> = {
+    ...(first as Record<string, unknown>),
+    ...p.set,
+  };
   for (const k of p.removed) delete out[k];
-  return { args: [out, ...args.slice(1)], changed: [...Object.keys(p.set), ...p.removed] };
+  return {
+    args: [out, ...args.slice(1)],
+    changed: [...Object.keys(p.set), ...p.removed],
+  };
 }
 
 function wrap<T extends (...a: unknown[]) => unknown>(name: string, fn: T): T {
   return ((...given: unknown[]) => {
     const { args, changed } = withEdits(name, given);
-    const note = [takeNote(name), changed.length ? `Includes your console edits: ${changed.join(', ')}.` : ''].filter(Boolean).join(' ') || undefined;
+    const note =
+      [
+        takeNote(name),
+        changed.length
+          ? `Includes your console edits: ${changed.join(', ')}.`
+          : '',
+      ]
+        .filter(Boolean)
+        .join(' ') || undefined;
     const started = performance.now();
     let out: unknown;
     try {
@@ -140,7 +183,13 @@ function wrap<T extends (...a: unknown[]) => unknown>(name: string, fn: T): T {
           return v;
         },
         e => {
-          logCall(name, args, started, { ok: false, value: errorValue(e) }, note);
+          logCall(
+            name,
+            args,
+            started,
+            { ok: false, value: errorValue(e) },
+            note,
+          );
           throw e;
         },
       );
@@ -162,8 +211,13 @@ function errorValue(e: unknown) {
 export async function createSdk(session: Session): Promise<Sdk> {
   pointAt(session.env);
   const publicApiKey = await resolvePublicKey(session);
-  const { default: MoneyHashHeadless } = await import('@moneyhash/js-sdk/headless');
-  const raw = new MoneyHashHeadless({ type: 'payment', publicApiKey, locale: session.lang ?? 'en' }) as Sdk;
+  const { default: MoneyHashHeadless } =
+    await import('@moneyhash/js-sdk/headless');
+  const raw = new MoneyHashHeadless({
+    type: 'payment',
+    publicApiKey,
+    locale: session.lang ?? 'en',
+  }) as Sdk;
 
   const logged = new Proxy(raw, {
     get(target, prop) {
@@ -172,7 +226,9 @@ export async function createSdk(session: Session): Promise<Sdk> {
       const value = Reflect.get(target, prop, target);
       if (typeof value !== 'function') return value;
       const bound = value.bind(target);
-      return typeof prop === 'string' && LOGGED.has(prop) ? wrap(prop, bound) : bound;
+      return typeof prop === 'string' && LOGGED.has(prop)
+        ? wrap(prop, bound)
+        : bound;
     },
   });
   // cardForm is an object of functions; log collect and pay.
@@ -180,13 +236,23 @@ export async function createSdk(session: Session): Promise<Sdk> {
   raw.cardForm = {
     ...cardForm,
     collect: wrap('cardForm.collect', cardForm.collect),
-    pay: wrap('cardForm.pay', cardForm.pay as (...a: unknown[]) => unknown) as typeof cardForm.pay,
-    binLookup: wrap('cardForm.binLookup', cardForm.binLookup as (...a: unknown[]) => unknown) as typeof cardForm.binLookup,
+    pay: wrap(
+      'cardForm.pay',
+      cardForm.pay as (...a: unknown[]) => unknown,
+    ) as typeof cardForm.pay,
+    binLookup: wrap(
+      'cardForm.binLookup',
+      cardForm.binLookup as (...a: unknown[]) => unknown,
+    ) as typeof cardForm.binLookup,
   };
   return logged;
 }
 
 /** The intent-secret switch, applied to the SDK. */
-export function applyIntentSecret(sdk: Sdk, session: Session, secret: string | undefined) {
+export function applyIntentSecret(
+  sdk: Sdk,
+  session: Session,
+  secret: string | undefined,
+) {
   if (session.useIntentSecret && secret) sdk.setIntentSecret(secret);
 }

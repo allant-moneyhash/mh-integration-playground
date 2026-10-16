@@ -20,7 +20,8 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
           placeholder=" "
           className={cn(
             'peer block h-10 w-full rounded-sm border border-input bg-transparent px-3 pt-4 pb-1 text-sm text-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20',
-            isError && 'border-red-500 focus:border-red-500 focus:ring-red-500/20',
+            isError &&
+              'border-red-500 focus:border-red-500 focus:ring-red-500/20',
             className,
           )}
           {...props}

@@ -16,12 +16,16 @@ const nextConfig: NextConfig = {
           // payment=*: wallets in MoneyHash's embed run in further nested frames
           // (MoneyHash's wallet session page, pay.google.com, Apple), which a list of
           // origins here would block. Each iframe still has to opt in with allow="payment".
-          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), payment=*' },
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=(), payment=*',
+          },
         ],
       },
       {
         // Apple Pay domain verification (with and without .txt), as plain text.
-        source: '/.well-known/apple-developer-merchantid-domain-association:ext(\\.txt)?',
+        source:
+          '/.well-known/apple-developer-merchantid-domain-association:ext(\\.txt)?',
         headers: [{ key: 'Content-Type', value: 'text/plain' }],
       },
       {

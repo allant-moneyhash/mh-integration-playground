@@ -23,23 +23,44 @@ export function CustomerPicker({ session }: { session: Session }) {
   const [error, setError] = useState<string | null>(null);
 
   const select = (id: string) => {
-    useConfig.getState().set({ customerIds: { ...useConfig.getState().customerIds, [accountKey(session)]: id.trim() } });
+    useConfig.getState().set({
+      customerIds: {
+        ...useConfig.getState().customerIds,
+        [accountKey(session)]: id.trim(),
+      },
+    });
     setDraft(id.trim());
   };
 
   return (
     <div className="space-y-2">
       <p className="text-xs text-subtle">
-        MoneyHash customer (optional). With one, the SDK flows show this customer’s saved cards and can save new cards.
+        MoneyHash customer (optional). With one, the SDK flows show this
+        customer’s saved cards and can save new cards.
       </p>
       <div className="flex flex-wrap gap-2">
-        <Input label="Customer ID" value={draft} onChange={e => setDraft(e.target.value)} containerClassName="min-w-60 flex-1" />
+        <Input
+          label="Customer ID"
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          containerClassName="min-w-60 flex-1"
+        />
         {customerId && draft.trim() === customerId ? (
-          <Button variant="outline" className="h-10" onClick={() => select('')} title="Check out as a guest">
+          <Button
+            variant="outline"
+            className="h-10"
+            onClick={() => select('')}
+            title="Check out as a guest"
+          >
             <X className="size-4" /> Guest
           </Button>
         ) : (
-          <Button variant="outline" className="h-10" disabled={!draft.trim()} onClick={() => select(draft)}>
+          <Button
+            variant="outline"
+            className="h-10"
+            disabled={!draft.trim()}
+            onClick={() => select(draft)}
+          >
             Use
           </Button>
         )}
@@ -71,7 +92,11 @@ export function CustomerPicker({ session }: { session: Session }) {
           Create test customer
         </Button>
       </div>
-      {customerId && <p className="text-xs text-green-700 dark:text-green-400">Using customer {customerId}</p>}
+      {customerId && (
+        <p className="text-xs text-green-700 dark:text-green-400">
+          Using customer {customerId}
+        </p>
+      )}
       {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );
