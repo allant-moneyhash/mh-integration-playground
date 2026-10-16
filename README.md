@@ -1,58 +1,85 @@
 # MoneyHash Integration Playground
 
-A demo store, built like [shop.moneyhash.io](https://shop.moneyhash.io), where you pick an integration
-(Payment, External or Direct API; JS SDK, hosted page or your own checkout) and watch every call
-between the store, MoneyHash and the webhook inbox in a live console.
+Try every MoneyHash integration in a working demo store, and see exactly what your
+server, the browser and MoneyHash send to each other.
 
-### [Open the playground](https://mh-integration-playground.vercel.app) · [MoneyHash docs](https://docs.moneyhash.io)
+**[Open the playground →](https://mh-integration-playground.vercel.app)**
 
-## Installing
+Pick an integration, pay with a test card, and a live console shows each call as it
+happens: the request, MoneyHash's response, what it means and what comes next, with a
+link to the docs for that step. Every page in the store is also a reference
+implementation you can copy from this repository.
+
+## What you can try
+
+| Integration                      | What it shows                                                                                  |
+| -------------------------------- | ---------------------------------------------------------------------------------------------- |
+| **Payment API + JS SDK**         | Your own checkout page: methods, saved cards, Apple Pay / Google Pay, 3DS, retries on failure. |
+| **Payment API + hosted page**    | MoneyHash's payment page, in an iframe or by redirect.                                         |
+| **Payment API + MoneyHash form** | `renderForm`: MoneyHash's form inside your page.                                               |
+| **External API**                 | Your server drives the intent (select method, pay saved cards); card details via the SDK.      |
+| **Direct API**                   | Your server also sends the card to the MoneyHash vault, from your own card form (PCI DSS).     |
+| **BIN lookup first**             | Look up a card or a wallet receipt before paying, then apply an offer or installment plans.    |
+
+Settings let you reproduce real setups: intent created up front or after the customer
+picks a method, `getMethods` with or without a flow and customer, 3DS in the page or by
+redirect, and your own JSON edits to any request.
+
+## Use it with your account
+
+1. Get a test-mode **Account API key** (secret) and **Public API key** from your MoneyHash dashboard.
+2. In the playground, open **Config** (top right), pick the environment that matches the keys and paste them.
+3. Fill in the checkout details and press **Continue to payment**.
+
+Your keys stay in your browser and only travel to the playground's server to make the
+call you asked for. They are never logged, never shown unmasked and never included in
+share links. Save a setup as a **preset** to come back to it, or copy a link to share
+the scenario (without keys) with your team or MoneyHash support.
+
+## Where to look in the code
+
+| You want to see…                         | Look at                                                                                      |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Creating a payment intent on your server | `src/app/api/mh/payment-intents/route.ts`, `src/lib/intent-body.ts`                          |
+| A headless JS SDK checkout               | `src/flows/sdk/checkout/sdk-checkout.tsx`, `card-form.tsx`, `express.tsx`, `saved-cards.tsx` |
+| BIN lookup before the intent             | `src/flows/sdk/checkout/card-first.tsx`                                                      |
+| External and Direct API calls            | `src/lib/server/intent-actions.ts`, `src/flows/server-driven/`                               |
+| Hosted page (iframe / redirect)          | `src/flows/embed-iframe/`, `src/flows/embed-redirect/`                                       |
+| Receiving and verifying webhooks         | `src/app/api/webhooks/route.ts`, `src/lib/server/webhooks.ts`                                |
+| Showing the order result from webhooks   | `src/components/checkout/order-view.tsx`, `src/lib/intent-outcome.ts`                        |
+
+## Run your own copy
+
+You need Node.js 20 or later.
 
 ```shell
-npm install @moneyhash/js-sdk
-```
-
-## Run locally
-
-```shell
+git clone https://github.com/allant-moneyhash/mh-integration-playground.git
+cd mh-integration-playground
 npm install
-cp .env.example .env.local   # fill in test-mode keys
+cp .env.example .env.local
 npm run dev
 ```
 
-Code style follows shop.moneyhash.io: Prettier (`npm run prettier:check`), EditorConfig, Node from `.nvmrc`,
-and conventional commit messages (`feat: …`, `fix: …`, `chore: …`), checked by `.githooks/commit-msg`.
+Open http://localhost:3000 and paste your keys in **Config**, or put them in
+`.env.local` (see `.env.example` for every variable). MoneyHash can't send webhooks to
+`localhost`, so to see them, deploy the app (for example to Vercel) or use a tunnel,
+and the store uses that URL as the intent's `webhook_url`.
 
-Without keys in `.env.local`, paste test keys into **Config** in the UI (kept for the tab, or saved with a preset in your browser only).
-Webhooks can't reach `localhost`; deploy to Vercel (or use a tunnel) to see them in the console.
+Deploying it publicly? Use test-mode keys only, set `MH_BLOCK_LIVE_KEYS=true`, and set
+the webhook signing keys so unsigned webhooks are refused. For Apple Pay, replace
+`public/.well-known/apple-developer-merchantid-domain-association` with the file
+for your own domain.
 
-## How it is put together
+## Contributing
 
-| Path                       | What it does                                                                           |
-| -------------------------- | -------------------------------------------------------------------------------------- |
-| `src/app/api/mh/*`         | Server routes. The only code that holds secret keys and calls MoneyHash (fixed hosts). |
-| `src/lib/server/mh.ts`     | MoneyHash client, key resolution, live-key guard, masked console entries.              |
-| `src/app/api/webhooks`     | Webhook receiver (`MoneyHash-Signature` v3 check) and the inbox the console polls.     |
-| `src/flows/*`              | One folder per integration flow, all implementing `IntegrationFlow`.                   |
-| `src/flows/session.ts`     | The only place that reads the "Use intent secret" switch.                              |
-| `src/lib/embed-options.ts` | Embed customisation options as data.                                                   |
-| `src/lib/mask.ts`          | Masking used by the server, the console and exports.                                   |
+Issues and pull requests are welcome. The code follows the same style as
+[shop.moneyhash.io](https://github.com/MoneyHash/shop.moneyhash.io): Prettier
+(`npm run prettier:fix`), EditorConfig and conventional commit messages
+(`feat: …`, `fix: …`). A pre-push hook scans for secrets, so keys never reach the
+repository.
 
-## Add a flow
+## Learn more
 
-1. Create `src/flows/<id>/index.tsx` exporting an `IntegrationFlow` (`steps`, optional `intentFields`, `Checkout`).
-2. Map the selection that picks it in `resolveFlow` (`src/flows/registry.ts`) and add any new setting to `src/flows/selection.ts`.
-3. If it calls new MoneyHash endpoints, add a server route under `src/app/api/mh/` that uses `mhCall`.
-
-## Apple Pay domain file
-
-`public/.well-known/apple-developer-merchantid-domain-association` verifies Apple Pay for the hosted demo's domain only. If you deploy your own copy, replace it with the file for your domain.
-
-## Security rules
-
-- Secret keys live only in server env vars or the user's own browser (tab storage, or a preset they saved); they reach MoneyHash only via our server and are never in share links, logs or exports.
-- Use test-mode keys for any demo keys you set on a public deployment: anyone who can open the site can use them. Set `MH_BLOCK_LIVE_KEYS=true` there.
-- With `MH_*_WEBHOOK_SIGNING_KEY` set, webhooks without a valid `MoneyHash-Signature` are refused.
-- Live-mode keys are allowed by default; the console shows a LIVE MODE entry whenever MoneyHash reports `is_live: true`. Set `MH_BLOCK_LIVE_KEYS=true` to refuse them: the intent is closed and the key blocked.
-- Everything shown in the console, exported, or saved as a preset is masked or stripped of secrets.
-- `npm run secret-scan` runs before every push (`.githooks/pre-push`); CI also runs gitleaks.
+- [MoneyHash documentation](https://docs.moneyhash.io)
+- [JS SDK on npm](https://www.npmjs.com/package/@moneyhash/js-sdk)
+- [shop.moneyhash.io](https://shop.moneyhash.io), MoneyHash's demo store
