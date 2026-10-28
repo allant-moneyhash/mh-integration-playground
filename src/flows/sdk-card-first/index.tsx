@@ -13,7 +13,7 @@ export const sdkCardFirstFlow: IntegrationFlow = {
   category: 'sdk',
   label: 'Headless, BIN lookup first',
   summary:
-    'Look up the card before paying: typed cards with cardForm.binLookup (then a bank offer and installments decide the amount), wallets with binLookupByReceipt on the Apple Pay / Google Pay receipt.',
+    'Know the card before the intent exists: a bank coupon is checked against the bank’s eligible BINs using the collected card, then the intent is created for the final amount. Optional BIN lookup and installments; wallets use binLookupByReceipt.',
   ready: true,
   usesEmbedUrl: false,
   steps: session => [
@@ -32,19 +32,19 @@ export const sdkCardFirstFlow: IntegrationFlow = {
       label: 'Card: MoneyHash card fields → cardForm.collect() (no intent yet)',
     },
     {
-      source: 'Frontend SDK',
+      source: 'Playground',
       label:
-        'cardForm.binLookup({ cardData }) → brand, type, issuer, issuer country',
+        'Your store: coupon code checked against the bank’s eligible BINs with cardData.first_six_digits (no MoneyHash call)',
     },
     {
       source: 'Frontend SDK',
       label:
-        'getInstallmentPlans({ first6Digits, amount, currency }) → plans for this card',
+        'Optional: cardForm.binLookup({ cardData }) → issuer, type, country; getInstallmentPlans → plans',
     },
     {
       source: 'Backend API',
       label:
-        'Store applies its offer → POST /payments/intent/ with the final amount and payment_method CARD',
+        'POST /payments/intent/ with the discounted amount and payment_method CARD',
     },
     {
       source: 'Frontend SDK',

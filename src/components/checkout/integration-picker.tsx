@@ -25,7 +25,7 @@ import {
 
 const SETTING_HINTS = {
   intentTiming:
-    'Methods first: the intent is created when the customer picks a method. Intent first: up front. BIN lookup first: the card (cardForm.binLookup) or the Apple Pay / Google Pay receipt (binLookupByReceipt) is looked up before paying; for cards the store can then apply an offer and installments before the intent.',
+    'Methods first: the intent is created when the customer picks a method. Intent first: up front. BIN lookup first: the card is collected before any intent, so the store can check a bank coupon against the card’s BIN (and optionally run BIN lookup or installments), then create the intent for the final amount.',
   threeDs:
     'In the page: the SDK shows the bank’s page here. Redirect: a full-page redirect.',
   hosted:

@@ -523,11 +523,13 @@ function EntryRow({
                 {next.meaning && ` — ${next.meaning}`}
               </p>
             )}
-            {entry.note && entry.source !== 'Webhook' && (
-              <p className="text-xs text-subtle [overflow-wrap:anywhere]">
-                {entry.note}
-              </p>
-            )}
+            {entry.note &&
+              entry.source !== 'Webhook' &&
+              entry.source !== 'Playground' && (
+                <p className="text-xs text-subtle [overflow-wrap:anywhere]">
+                  {entry.note}
+                </p>
+              )}
             {!entry.ok && ex.fix && (
               <p className="rounded border border-destructive/40 px-3 py-2 text-xs [overflow-wrap:anywhere]">
                 <span className="font-medium text-destructive">
