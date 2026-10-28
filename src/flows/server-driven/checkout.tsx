@@ -14,6 +14,11 @@
 //   3DS         page (the SDK renders it here) or redirect
 // Steps the APIs can't drive yet (OTP, instalments, saved-card CVV, non-card form
 // fields) fall back to the SDK on the same intent.
+// "BIN lookup first" (intentTiming card-first): no intent when the page opens. The card
+// comes first (Direct: your own form, so your server has the card number; otherwise the
+// SDK's cardForm.collect()), a bank coupon is checked against its first six digits, and
+// only then does your server create the intent for the final amount and pay it with
+// that same card.
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CreditCard, Loader2, RefreshCw } from 'lucide-react';
@@ -44,10 +49,20 @@ import {
 } from '../sdk/runtime';
 import { ExpressCheckout } from '../sdk/checkout/express';
 import type {
+  CardData,
   Field,
   Method,
   NativeReceiptData,
 } from '@moneyhash/js-sdk/headless';
+import {
+  CouponOutcome,
+  CouponPanel,
+  DEFAULT_COUPON,
+  checkCoupon,
+  couponTotal,
+  type Coupon,
+  type CouponResult,
+} from '../coupon';
 import type { FlowCheckoutProps } from '../types';
 import type { CheckoutSettings } from '../selection';
 
@@ -191,7 +206,10 @@ function readWallets(details: Obj): Method[] {
     .filter(m => m.id);
 }
 
-type Settings = Pick<CheckoutSettings, 'cardEntry' | 'wallets' | 'threeDs'>;
+type Settings = Pick<
+  CheckoutSettings,
+  'intentTiming' | 'cardEntry' | 'wallets' | 'threeDs'
+>;
 
 /**
  * One checkout page for the External and Direct APIs: wallets, saved cards and
@@ -233,6 +251,17 @@ export function ServerDrivenCheckout({
     String(intentBody.amount_currency) as Currency,
   );
   const ownCard = cardEntry === 'own';
+  const cardFirst = settings.intentTiming === 'card-first';
+  const [coupon, setCoupon] = useState<Coupon>(DEFAULT_COUPON);
+  /** The card checked before the intent: raw (Direct, your form) or the SDK's cardData. */
+  const [cf, setCf] = useState<{
+    last4: string;
+    result: CouponResult;
+    raw?: RawCard;
+    cardData?: CardData;
+    saveCard?: boolean;
+  } | null>(null);
+  const base = Number(intentBody.amount);
 
   // Direct API with your own form: picking CARD needs no call yet; your server selects CARD and sends the card in one go.
   const cardStep =
@@ -253,9 +282,10 @@ export function ServerDrivenCheckout({
     return sdkRef.current;
   }
 
-  // SDK card fields need the SDK ready when the card step opens.
+  // SDK card fields need the SDK ready when the card step opens (BIN lookup first: at once,
+  // before any intent; the public key is enough to collect the card).
   useEffect(() => {
-    if (!cardStep || cardEntry !== 'sdk' || !intent) return;
+    if (cardEntry !== 'sdk' || !(cardFirst || (cardStep && intent))) return;
     ensureSdk().catch(e => setError(errorText(e)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cardStep, cardEntry, intent]);
@@ -266,7 +296,12 @@ export function ServerDrivenCheckout({
   }, [sdkDetails, intent, router]);
 
   /** Every External/Direct response has the same envelope: data.intent, data.state, data.state_details. */
-  async function apply(res: MhEnvelope<Obj>, id: string, methodId?: string) {
+  async function apply(
+    res: MhEnvelope<Obj>,
+    id: string,
+    methodId?: string,
+    secret = intent?.secret,
+  ) {
     const data = obj(res.data);
     const state = str(data.state) ?? str(obj(data.intent).state) ?? '';
     const details = obj(data.state_details);
@@ -290,7 +325,7 @@ export function ServerDrivenCheckout({
         setFrameUrl(
           embedUrlFor(session, {
             id,
-            intent_secret: intent?.secret,
+            intent_secret: secret,
             embed_url: url,
           }),
         );
@@ -316,7 +351,8 @@ export function ServerDrivenCheckout({
 
   // "Continue to payment" was the go-ahead: the backend creates the intent now.
   useEffect(() => {
-    if (started.current) return;
+    // BIN lookup first: no intent until the card is checked (see the effect below).
+    if (started.current || cardFirst) return;
     started.current = true;
     run('create', async () => {
       const res = await serverIntentCall(session, api, 'create', {
@@ -455,6 +491,190 @@ export function ServerDrivenCheckout({
     );
   }
 
+  /** BIN lookup first: your server creates the intent for the final amount, then the same card pays it. */
+  function payCardFirst() {
+    if (!cf) return;
+    run('pay', async () => {
+      const { total } = couponTotal(base, cf.result);
+      const body: Obj = {
+        ...intentBody,
+        amount: total,
+        ...(customerId
+          ? { customer: customerId, allow_tokenize_card: true }
+          : {}),
+      };
+      // The basket lines no longer add up to a discounted amount.
+      if (total !== base) delete body.product_items;
+      const res = await serverIntentCall(session, api, 'create', { body });
+      const i = obj(obj(res.data).intent);
+      const id = str(i.id);
+      if (!id)
+        throw new Error(
+          'MoneyHash did not return an intent id. See the console.',
+        );
+      const secret = str(i.intent_secret);
+      setIntent({ id, secret });
+      setSelected('CARD');
+      if (cf.raw) {
+        // Direct, your own form: your server selects CARD and sends the same card to the vault.
+        await apply(
+          await serverIntentCall(session, 'direct', 'pay-card', {
+            intentId: id,
+            body: { card: cf.raw },
+          }),
+          id,
+          'CARD',
+          secret,
+        );
+        return;
+      }
+      // SDK card: your server selects CARD, then the collected card pays the intent.
+      await serverIntentCall(session, api, 'update-method', {
+        intentId: id,
+        body: { payment_method: 'CARD' },
+      });
+      const s = await ensureSdk(secret);
+      applyIntentSecret(s, session, secret);
+      const d = await s.cardForm.pay({
+        intentId: id,
+        cardData: cf.cardData!,
+        ...(cf.saveCard !== undefined ? { saveCard: cf.saveCard } : {}),
+      });
+      const sd = d.stateDetails as {
+        url?: string;
+        renderStrategy?: string;
+      } | null;
+      if (
+        sd?.url &&
+        (sd.renderStrategy === 'REDIRECT' || threeDs === 'redirect')
+      )
+        window.location.href = sd.url;
+      else setSdkDetails(d);
+    });
+  }
+
+  if (cardFirst && !intent) {
+    const { discount, total } = couponTotal(base, cf?.result ?? null);
+    const currency = String(intentBody.amount_currency) as Currency;
+    return (
+      <div className="space-y-6">
+        <div>
+          <h3 className="font-medium text-bolder">Card</h3>
+          <p className="text-sm text-subtler">
+            No intent yet: the card comes first so your server can price the
+            order.
+          </p>
+          {!cf && (
+            <CouponPanel
+              coupon={coupon}
+              onChange={setCoupon}
+              hint={
+                ownCard
+                  ? 'Your server has the card number from your own form, so it compares the first six digits with this list.'
+                  : 'Your store compares cardData.first_six_digits from cardForm.collect() with this list.'
+              }
+            />
+          )}
+        </div>
+
+        {!cf &&
+          (ownCard ? (
+            <div className="rounded-md border border-input p-4">
+              <OwnCardForm
+                payLabel="Check card"
+                offerSaveCard={!!customerId}
+                onPay={async card => {
+                  const result = checkCoupon(
+                    coupon,
+                    card.card_number.slice(0, 6),
+                    {
+                      who: 'Your server',
+                      from: 'the first six digits of the card number your own form sent',
+                    },
+                  );
+                  setCf({
+                    last4: card.card_number.slice(-4),
+                    result,
+                    raw: card,
+                  });
+                }}
+              />
+            </div>
+          ) : sdk ? (
+            <div className="rounded-md border border-input">
+              <CardForm
+                key={layout}
+                sdk={sdk}
+                layout={layout}
+                payLabel="Check card"
+                offerSaveCard={!!customerId}
+                onPay={async ({ saveCard }) => {
+                  const cardData = await sdk.cardForm.collect();
+                  const result = checkCoupon(
+                    coupon,
+                    cardData.first_six_digits,
+                    {
+                      who: 'Your store',
+                      from: 'cardData.first_six_digits from cardForm.collect()',
+                    },
+                  );
+                  setCf({
+                    last4: cardData.last_four_digits,
+                    result,
+                    cardData,
+                    saveCard,
+                  });
+                }}
+              />
+            </div>
+          ) : (
+            <p className="flex items-center gap-2 text-sm text-subtle">
+              <Loader2 className="size-4 animate-spin" /> Loading the JS SDK
+              card fields…
+            </p>
+          ))}
+
+        {cf && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between rounded-md border border-input p-4 text-sm">
+              <span className="text-bolder">Card •••• {cf.last4}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={!!busy}
+                onClick={() => setCf(null)}
+              >
+                Change card
+              </Button>
+            </div>
+            <CouponOutcome coupon={coupon} result={cf.result} />
+            <div className="space-y-1 rounded-md border border-input p-4 text-sm">
+              <div className="flex justify-between text-subtle">
+                <span>Order</span>
+                <span>{formatMoney(base, currency)}</span>
+              </div>
+              {discount > 0 && (
+                <div className="flex justify-between text-subtle">
+                  <span>Coupon {coupon.code.trim()}</span>
+                  <span>−{formatMoney(discount, currency)}</span>
+                </div>
+              )}
+              <div className="flex justify-between font-medium text-bolder">
+                <span>Total</span>
+                <span>{formatMoney(total, currency)}</span>
+              </div>
+            </div>
+            <Button className="w-full" disabled={!!busy} onClick={payCardFirst}>
+              {busy && <Loader2 className="size-4 animate-spin" />}
+              Pay {formatMoney(total, currency)}
+            </Button>
+          </div>
+        )}
+        {error && <p className="text-sm text-destructive">{error}</p>}
+      </div>
+    );
+  }
+
   if (!intent) {
     return error ? (
       <p className="text-sm text-destructive">{error}</p>
@@ -584,6 +804,37 @@ export function ServerDrivenCheckout({
           Your server got URL_TO_RENDER with state_details.embed_url; it is
           shown here. The final webhook moves this page on.
         </p>
+      </div>
+    );
+  }
+
+  // BIN lookup first, after the intent: only the card's next steps (3DS, OTP…) remain.
+  if (cardFirst) {
+    return (
+      <div className="space-y-4">
+        {sdkPanel()}
+        {!sdkDetails && current && !DONE.includes(current.state) && (
+          <div className="flex items-center justify-between gap-3 rounded-md border p-3 text-sm">
+            <span className="text-subtle">
+              Intent state:{' '}
+              <span className="font-mono text-bolder">{current.state}</span>
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={refresh}
+              disabled={!!busy}
+            >
+              <RefreshCw className="size-3.5" /> Check state
+            </Button>
+          </div>
+        )}
+        {busy && (
+          <p className="flex items-center gap-2 text-sm text-subtle">
+            <Loader2 className="size-4 animate-spin" /> Paying…
+          </p>
+        )}
+        {error && <p className="text-sm text-destructive">{error}</p>}
       </div>
     );
   }

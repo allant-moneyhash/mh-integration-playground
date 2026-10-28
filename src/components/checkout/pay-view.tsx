@@ -80,9 +80,7 @@ function Pay() {
   const details =
     sel.experience === 'checkout'
       ? [
-          sel.api === 'payment'
-            ? SETTING_LABELS.intentTiming[s.intentTiming]
-            : null,
+          SETTING_LABELS.intentTiming[s.intentTiming],
           `Card: ${SETTING_LABELS.cardEntry[s.cardEntry]}`,
           `Wallets: ${SETTING_LABELS.wallets[s.wallets]}`,
           `3DS: ${SETTING_LABELS.threeDs[s.threeDs].toLowerCase()}`,

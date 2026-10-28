@@ -24,8 +24,15 @@ import { createPaymentIntent } from '@/lib/api-client';
 import { formatMoney, type Currency } from '@/lib/catalog';
 import type { IntentBody } from '@/lib/intent-body';
 import { useConfig } from '@/store/config';
-import { Input } from '@/components/ui/input';
-import { newId, useConsole } from '@/store/console';
+import {
+  CouponOutcome,
+  CouponPanel,
+  DEFAULT_COUPON,
+  checkCoupon,
+  couponTotal,
+  type Coupon,
+  type CouponResult,
+} from '../../coupon';
 import { accountKey, type Session } from '../../session';
 import {
   applyIntentSecret,
@@ -46,30 +53,6 @@ type Checked = {
   saveCard?: boolean;
   coupon: CouponResult;
 };
-
-/**
- * A bank coupon: valid only for cards whose BIN is on the list the bank gives the
- * merchant. Prefilled with the BIN of the 4242 test card so the demo works out of the box.
- */
-type Coupon = { code: string; bins: string; percent: string };
-const DEFAULT_COUPON: Coupon = {
-  code: 'BANK10',
-  bins: '424242',
-  percent: '10',
-};
-
-/** The BINs the bank listed (6 or 8 digits); a card matches on its first six digits. */
-const binList = (bins: string) =>
-  bins
-    .split(/[\s,;]+/)
-    .map(b => b.replace(/\D/g, ''))
-    .filter(b => b.length >= 6);
-
-type CouponResult = {
-  applied: boolean;
-  percent: number;
-  reason: string;
-} | null;
 
 export function CardFirstCheckout({
   intentBody,
@@ -105,10 +88,7 @@ export function CardFirstCheckout({
   const currency = String(intentBody.amount_currency) as Currency;
   const base = Number(intentBody.amount);
   const result = checked?.coupon ?? null;
-  const discount = result?.applied
-    ? Math.round(base * result.percent) / 100
-    : 0;
-  const total = Math.round((base - discount) * 100) / 100;
+  const { discount, total } = couponTotal(base, result);
 
   useEffect(() => {
     if (started.current) return;
@@ -194,49 +174,15 @@ export function CardFirstCheckout({
       router.replace(orderUrl(intentId));
   }, [details, intentId, router]);
 
-  /** The store's own coupon rule, logged so the audience sees it runs on your side. */
-  function checkCoupon(card: CardData): CouponResult {
-    const code = coupon.code.trim();
-    if (!code) return null;
-    const bins = binList(coupon.bins);
-    const first6 = card.first_six_digits;
-    const percent = Math.min(Math.max(Number(coupon.percent) || 0, 0), 100);
-    const match = bins.find(b => b.slice(0, 6) === first6);
-    const out: CouponResult = match
-      ? {
-          applied: true,
-          percent,
-          reason: `BIN ${first6} is on the bank's list for ${code}.`,
-        }
-      : {
-          applied: false,
-          percent,
-          reason: `BIN ${first6} is not on the bank's list for ${code}, so the full amount applies.`,
-        };
-    useConsole.getState().add({
-      id: newId(),
-      ts: Date.now(),
-      source: 'Playground',
-      title: `Your store: coupon ${code} checked against the bank's BINs`,
-      request: {
-        body: { coupon: code, first_six_digits: first6, eligible_bins: bins },
-      },
-      response: {
-        applied: out.applied,
-        discount_percent: out.applied ? percent : 0,
-      },
-      ok: true,
-      note: `${out.reason} Your server's own rule using cardData.first_six_digits from cardForm.collect(); no MoneyHash call. The same collected card is paid next, so the customer can't swap cards after the check.`,
-    });
-    return out;
-  }
-
   /** Step 1: collect the card (no intent yet), apply the coupon, and optionally look it up. */
   async function checkCard({ saveCard }: { saveCard?: boolean }) {
     if (!sdk) return;
     setError(null);
     const card = await sdk.cardForm.collect();
-    const couponResult = checkCoupon(card);
+    const couponResult = checkCoupon(coupon, card.first_six_digits, {
+      who: 'Your store',
+      from: 'cardData.first_six_digits from cardForm.collect()',
+    });
     const bin = useBinLookup
       ? await sdk.cardForm.binLookup({ cardData: card }).catch(() => null)
       : null;
@@ -374,11 +320,30 @@ export function CardFirstCheckout({
           <CouponPanel
             coupon={coupon}
             onChange={setCoupon}
-            useBinLookup={useBinLookup}
-            onBinLookup={setUseBinLookup}
-            usePlans={usePlans}
-            onPlans={setUsePlans}
-          />
+            hint="Your store checks the card’s first six digits against this list after cardForm.collect()."
+          >
+            <div className="space-y-1 text-sm text-subtle">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  className="size-4 accent-[hsl(var(--primary))]"
+                  checked={useBinLookup}
+                  onChange={e => setUseBinLookup(e.target.checked)}
+                />
+                Also run MoneyHash BIN lookup (issuer, type, country; the
+                service must be enabled on the account)
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  className="size-4 accent-[hsl(var(--primary))]"
+                  checked={usePlans}
+                  onChange={e => setUsePlans(e.target.checked)}
+                />
+                Also list installment plans for the card
+              </label>
+            </div>
+          </CouponPanel>
         )}
         {/* Kept mounted after the check so "Change card" keeps what was typed. */}
         <div
@@ -411,19 +376,7 @@ export function CardFirstCheckout({
             </Button>
           </div>
 
-          <div className="rounded-md border border-input p-4 text-sm">
-            <p className="text-bolder">
-              {result
-                ? result.applied
-                  ? `Coupon ${coupon.code.trim()}: ${result.percent}% off`
-                  : `Coupon ${coupon.code.trim()}: not valid for this card`
-                : 'No coupon entered'}
-            </p>
-            <p className="text-subtle">
-              {result?.reason ??
-                'Enter a coupon before checking the card to apply a bank discount.'}
-            </p>
-          </div>
+          <CouponOutcome coupon={coupon} result={result} />
 
           {useBinLookup && (
             <LookupTable title="MoneyHash BIN lookup" bin={bin ?? null} />
@@ -544,73 +497,5 @@ function LookupTable({
         </dd>
       )}
     </dl>
-  );
-}
-
-/** The store's coupon setup, edited before the card is checked. */
-function CouponPanel({
-  coupon,
-  onChange,
-  useBinLookup,
-  onBinLookup,
-  usePlans,
-  onPlans,
-}: {
-  coupon: Coupon;
-  onChange: (c: Coupon) => void;
-  useBinLookup: boolean;
-  onBinLookup: (v: boolean) => void;
-  usePlans: boolean;
-  onPlans: (v: boolean) => void;
-}) {
-  const set = (patch: Partial<Coupon>) => onChange({ ...coupon, ...patch });
-  return (
-    <div className="mt-2 space-y-3 rounded-md border border-input p-4">
-      <p className="text-sm text-bolder">Bank coupon</p>
-      <div className="grid grid-cols-2 gap-3">
-        <Input
-          label="Coupon code"
-          value={coupon.code}
-          onChange={e => set({ code: e.target.value })}
-        />
-        <Input
-          label="Discount %"
-          inputMode="decimal"
-          value={coupon.percent}
-          onChange={e => set({ percent: e.target.value })}
-        />
-      </div>
-      <Input
-        label="Eligible BINs from the bank (comma separated)"
-        value={coupon.bins}
-        onChange={e => set({ bins: e.target.value })}
-      />
-      <p className="text-xs text-subtle">
-        Your store checks the card’s first six digits against this list after
-        cardForm.collect(). 424242 matches the 4242 test card; any other card
-        pays the full amount.
-      </p>
-      <div className="space-y-1 text-sm text-subtle">
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            className="size-4 accent-[hsl(var(--primary))]"
-            checked={useBinLookup}
-            onChange={e => onBinLookup(e.target.checked)}
-          />
-          Also run MoneyHash BIN lookup (issuer, type, country; the service must
-          be enabled on the account)
-        </label>
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            className="size-4 accent-[hsl(var(--primary))]"
-            checked={usePlans}
-            onChange={e => onPlans(e.target.checked)}
-          />
-          Also list installment plans for the card
-        </label>
-      </div>
-    </div>
   );
 }

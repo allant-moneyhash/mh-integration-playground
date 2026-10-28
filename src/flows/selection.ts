@@ -87,14 +87,38 @@ export const EXPERIENCES: {
 export const ALLOWED: Record<
   BackendApi,
   {
+    intentTiming: CheckoutSettings['intentTiming'][];
     cardEntry: CheckoutSettings['cardEntry'][];
     wallets: CheckoutSettings['wallets'][];
   }
 > = {
-  payment: { cardEntry: ['sdk'], wallets: ['sdk'] },
-  external: { cardEntry: ['sdk', 'embed'], wallets: ['own', 'sdk'] },
-  direct: { cardEntry: ['own', 'sdk', 'embed'], wallets: ['own', 'sdk'] },
+  payment: {
+    intentTiming: ['methods-first', 'intent-first', 'card-first'],
+    cardEntry: ['sdk'],
+    wallets: ['sdk'],
+  },
+  // Your server creates the intent on External / Direct: up front, or after the card check.
+  external: {
+    intentTiming: ['intent-first', 'card-first'],
+    cardEntry: ['sdk', 'embed'],
+    wallets: ['own', 'sdk'],
+  },
+  direct: {
+    intentTiming: ['intent-first', 'card-first'],
+    cardEntry: ['own', 'sdk', 'embed'],
+    wallets: ['own', 'sdk'],
+  },
 };
+
+/** Card entry that works with this timing: the embed needs an intent, so not before one exists. */
+export function cardEntriesFor(
+  api: BackendApi,
+  timing: CheckoutSettings['intentTiming'],
+) {
+  return ALLOWED[api].cardEntry.filter(
+    c => !(timing === 'card-first' && c === 'embed'),
+  );
+}
 
 export const SETTING_LABELS = {
   intentTiming: {
@@ -142,13 +166,16 @@ export function normalise(sel: Selection): Selection {
   const s = { ...DEFAULT_SETTINGS, ...sel.settings };
   // Saved before the lookup scenarios existed ("customer" sent whatever was set).
   if (!METHODS_LOOKUPS.includes(s.methodsLookup)) s.methodsLookup = 'auto';
+  const intentTiming = allowed.intentTiming.includes(s.intentTiming)
+    ? s.intentTiming
+    : allowed.intentTiming[0];
+  const cards = cardEntriesFor(sel.api, intentTiming);
   return {
     ...sel,
     settings: {
       ...s,
-      cardEntry: allowed.cardEntry.includes(s.cardEntry)
-        ? s.cardEntry
-        : allowed.cardEntry[0],
+      intentTiming,
+      cardEntry: cards.includes(s.cardEntry) ? s.cardEntry : cards[0],
       wallets: allowed.wallets.includes(s.wallets)
         ? s.wallets
         : allowed.wallets[0],

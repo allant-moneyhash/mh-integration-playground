@@ -13,6 +13,7 @@ import { BACKEND_APIS } from '@/flows/types';
 import { useConfig } from '@/store/config';
 import {
   ALLOWED,
+  cardEntriesFor,
   EXPERIENCES,
   SETTING_LABELS,
   normalise,
@@ -26,6 +27,8 @@ import {
 const SETTING_HINTS = {
   intentTiming:
     'Methods first: the intent is created when the customer picks a method. Intent first: up front. BIN lookup first: the card is collected before any intent, so the store can check a bank coupon against the card’s BIN (and optionally run BIN lookup or installments), then create the intent for the final amount.',
+  intentTimingServer:
+    'Intent first: your server creates the intent as the page opens. BIN lookup first: the card comes first (your own form on Direct, SDK card fields otherwise), your server checks a bank coupon against its BIN, then creates the intent for the final amount and pays with that same card.',
   threeDs:
     'In the page: the SDK shows the bank’s page here. Redirect: a full-page redirect.',
   hosted:
@@ -90,17 +93,20 @@ export function IntegrationPicker({
 
       {experience === 'checkout' && (
         <div className="space-y-4">
-          {api === 'payment' && (
-            <PrefixedSelect
-              prefix="Intent created"
-              value={settings.intentTiming}
-              options={(
-                ['methods-first', 'intent-first', 'card-first'] as const
-              ).map(v => ({ value: v, label: SETTING_LABELS.intentTiming[v] }))}
-              onChange={v => set({ intentTiming: v })}
-              hint={SETTING_HINTS.intentTiming}
-            />
-          )}
+          <PrefixedSelect
+            prefix="Intent created"
+            value={settings.intentTiming}
+            options={ALLOWED[api].intentTiming.map(v => ({
+              value: v,
+              label: SETTING_LABELS.intentTiming[v],
+            }))}
+            onChange={v => set({ intentTiming: v })}
+            hint={
+              api === 'payment'
+                ? SETTING_HINTS.intentTiming
+                : SETTING_HINTS.intentTimingServer
+            }
+          />
           {api === 'payment' && settings.intentTiming !== 'card-first' && (
             <PrefixedSelect
               prefix="getMethods for"
@@ -120,7 +126,7 @@ export function IntegrationPicker({
           <PrefixedSelect
             prefix="Card details"
             value={settings.cardEntry}
-            options={ALLOWED[api].cardEntry.map(v => ({
+            options={cardEntriesFor(api, settings.intentTiming).map(v => ({
               value: v,
               label: SETTING_LABELS.cardEntry[v],
             }))}

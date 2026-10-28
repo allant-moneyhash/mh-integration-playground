@@ -49,7 +49,7 @@ export function resolveFlow(selection: Selection): IntegrationFlow {
     sel.experience === 'checkout'
       ? sel.api === 'payment'
         ? `${s.intentTiming}-${s.threeDs}-${s.methodsLookup}`
-        : `${s.cardEntry}-${s.wallets}-${s.threeDs}`
+        : `${s.intentTiming}-${s.cardEntry}-${s.wallets}-${s.threeDs}`
       : sel.experience === 'hosted'
         ? s.hosted
         : '';
