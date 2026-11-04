@@ -65,69 +65,112 @@ export function serverCheckoutFlow(
     },
     webhookStep,
   ];
+  // Intent on Pay: the card form is shown first; the Pay click creates the intent.
+  const payClickSteps = (): FlowStep[] => [
+    cardEntry === 'own'
+      ? {
+          source: 'Frontend',
+          label:
+            'Your own card form; on Pay it sends the card to your server (no intent yet)',
+        }
+      : {
+          source: 'Frontend SDK',
+          label:
+            'SDK card fields (public key, no intent yet); on Pay → cardForm.collect()',
+        },
+    cardEntry === 'own'
+      ? {
+          source: 'Backend API',
+          label: `POST /direct/payments/intent/ with payment_method CARD → FORM_FIELDS with state_details.meta.url (vault URL, 5 minutes)`,
+        }
+      : {
+          source: 'Backend API',
+          label: `POST /${api}/payments/intent/, then update-method { CARD }`,
+        },
+    cardEntry === 'own'
+      ? {
+          source: 'Backend API',
+          label:
+            'POST the card straight to that vault URL (…/intents/{id}/CARD/); no update-method call',
+        }
+      : {
+          source: 'Frontend SDK',
+          label: 'cardForm.pay({ intentId, cardData }) with the collected card',
+        },
+    {
+      source: 'Frontend',
+      label:
+        threeDs === 'page'
+          ? '3DS: URL_TO_RENDER → state_details.embed_url shown in the page'
+          : '3DS: URL_TO_RENDER → redirect the customer to state_details.embed_url',
+    },
+    webhookStep,
+  ];
   const steps = (
     session: Parameters<IntegrationFlow['steps']>[0],
   ): FlowStep[] =>
     settings.intentTiming === 'card-first'
       ? cardFirstSteps()
-      : [
-          {
-            source: 'Backend API',
-            label: `POST /${api}/payments/intent/ → METHOD_SELECTION with payment_methods, express_methods and saved_cards`,
-          },
-          wallets === 'own'
-            ? {
-                source: 'Backend API',
-                label: `Wallet: your Apple Pay / Google Pay button → Apple session via POST /providers/applepay/session/ → update-method + POST /${api}/payments/intents/{id}/receipt/`,
-              }
-            : {
-                source: 'Frontend SDK',
-                label:
-                  'Wallet: SDK wallet button → proceedWith + submitPaymentReceipt on the same intent',
-              },
-          {
-            source: 'Backend API',
-            label: `Saved card: POST /${api}/payments/intents/{id}/card_token/ { card_token_id, cvv }`,
-          },
-          {
-            source: 'Backend API',
-            label: `Other methods: POST /${api}/payments/intents/{id}/update-method/ { payment_method }`,
-          },
-          cardEntry === 'own'
-            ? {
-                source: 'Backend API',
-                label:
-                  'Card (your own form): your server calls update-method { CARD } → state_details.meta.url (5-minute vault URL) → POST the card to it',
-              }
-            : cardEntry === 'sdk'
+      : settings.intentTiming === 'pay-click'
+        ? payClickSteps()
+        : [
+            {
+              source: 'Backend API',
+              label: `POST /${api}/payments/intent/ → METHOD_SELECTION with payment_methods, express_methods and saved_cards`,
+            },
+            wallets === 'own'
               ? {
+                  source: 'Backend API',
+                  label: `Wallet: your Apple Pay / Google Pay button → Apple session via POST /providers/applepay/session/ → update-method + POST /${api}/payments/intents/{id}/receipt/`,
+                }
+              : {
                   source: 'Frontend SDK',
                   label:
-                    'Card: SDK card fields → cardForm.collect() → cardForm.pay({ intentId })',
+                    'Wallet: SDK wallet button → proceedWith + submitPaymentReceipt on the same intent',
+                },
+            {
+              source: 'Backend API',
+              label: `Saved card: POST /${api}/payments/intents/{id}/card_token/ { card_token_id, cvv }`,
+            },
+            {
+              source: 'Backend API',
+              label: `Other methods: POST /${api}/payments/intents/{id}/update-method/ { payment_method }`,
+            },
+            cardEntry === 'own'
+              ? {
+                  source: 'Backend API',
+                  label:
+                    'Card (your own form): your server calls update-method { CARD } → state_details.meta.url (5-minute vault URL) → POST the card to it',
+                }
+              : cardEntry === 'sdk'
+                ? {
+                    source: 'Frontend SDK',
+                    label:
+                      'Card: SDK card fields → cardForm.collect() → cardForm.pay({ intentId })',
+                  }
+                : {
+                    source: 'Frontend',
+                    label: 'Card: MoneyHash embed for the intent in an iframe',
+                    secret: embedSecretNote(session),
+                  },
+            threeDs === 'page'
+              ? {
+                  source: 'Frontend',
+                  label:
+                    '3DS and provider pages: show state_details.embed_url from your server’s response in a frame',
                 }
               : {
                   source: 'Frontend',
-                  label: 'Card: MoneyHash embed for the intent in an iframe',
-                  secret: embedSecretNote(session),
+                  label:
+                    '3DS and provider pages: redirect the customer to state_details.embed_url',
                 },
-          threeDs === 'page'
-            ? {
-                source: 'Frontend',
-                label:
-                  '3DS and provider pages: show state_details.embed_url from your server’s response in a frame',
-              }
-            : {
-                source: 'Frontend',
-                label:
-                  '3DS and provider pages: redirect the customer to state_details.embed_url',
-              },
-          {
-            source: 'Frontend SDK',
-            label:
-              'OTP, instalment plans, saved-card CVV: the SDK takes over on the same intent (no API endpoint yet)',
-          },
-          webhookStep,
-        ];
+            {
+              source: 'Frontend SDK',
+              label:
+                'OTP, instalment plans, saved-card CVV: the SDK takes over on the same intent (no API endpoint yet)',
+            },
+            webhookStep,
+          ];
   return {
     id: `${api}-checkout`,
     api,

@@ -76,7 +76,11 @@ const ACTIONS: Record<
   },
 };
 
-/** Hosts the Direct API vault URL may point to (never a URL the browser supplies). */
+/**
+ * Hosts the Direct API vault URL may point to. The URL comes from MoneyHash (an
+ * update-method or create response); a URL the browser passes on is only used when it
+ * is on one of these hosts and for this intent.
+ */
 const VAULT_HOSTS: Record<string, string[]> = {
   staging: [new URL(ENVIRONMENTS.staging.vault).host, 'stg-vault.moneyhash.io'],
   production: [new URL(ENVIRONMENTS.production.vault).host],
@@ -129,27 +133,40 @@ function readCard(body: unknown): Card {
   };
 }
 
-/** Direct API card payment: fetch a fresh vault URL (5-minute token), then post the card to it. */
+/**
+ * Direct API card payment: post the card to the intent's vault URL (5-minute token).
+ * With `vaultUrl` (the intent was created with payment_method CARD, so its create
+ * response already carried state_details.meta.url) the card goes straight to the
+ * vault; otherwise update-method { CARD } fetches a fresh URL first.
+ */
 async function payWithCard(
   target: Target,
   apiKey: string,
   id: string,
   card: Card,
   saveCard: boolean,
+  vaultUrl?: string,
 ): Promise<CallResult[]> {
-  const selected = await mhCall({
-    target,
-    apiKey,
-    method: 'POST',
-    path: `/direct/payments/intents/${id}/update-method/`,
-    body: { payment_method: 'CARD' },
-    title: 'Direct: select CARD (gets the vault URL)',
-  });
-  if (!selected.ok) return [selected];
-  const meta = (
-    selected.data as { data?: { state_details?: { meta?: { url?: unknown } } } }
-  )?.data?.state_details?.meta;
-  const raw = typeof meta?.url === 'string' ? meta.url : '';
+  let selected: CallResult | null = null;
+  let raw = vaultUrl ?? '';
+  if (!raw) {
+    selected = await mhCall({
+      target,
+      apiKey,
+      method: 'POST',
+      path: `/direct/payments/intents/${id}/update-method/`,
+      body: { payment_method: 'CARD' },
+      title: 'Direct: select CARD (gets the vault URL)',
+    });
+    if (!selected.ok) return [selected];
+    const meta = (
+      selected.data as {
+        data?: { state_details?: { meta?: { url?: unknown } } };
+      }
+    )?.data?.state_details?.meta;
+    raw = typeof meta?.url === 'string' ? meta.url : '';
+  }
+  const before = selected ? [selected.entry] : [];
   let vault: URL;
   try {
     vault = new URL(raw);
@@ -157,7 +174,7 @@ async function payWithCard(
     throw new RequestError(
       502,
       'MoneyHash did not return a vault URL for the card. See the console.',
-      [selected.entry],
+      before,
     );
   }
   if (
@@ -168,7 +185,7 @@ async function payWithCard(
     throw new RequestError(
       502,
       `Unexpected vault host ${vault.host}; the card was not sent.`,
-      [selected.entry],
+      before,
     );
   }
   const paid = await mhCall({
@@ -186,7 +203,7 @@ async function payWithCard(
     },
     title: 'Direct: send card to the vault',
   });
-  return [selected, paid];
+  return selected ? [selected, paid] : [paid];
 }
 
 /**
@@ -316,13 +333,17 @@ export async function handleIntentAction(req: Request, api: ServerApi) {
 
     let results: CallResult[];
     if (action === 'pay-card') {
-      const body = input.body as { card?: { save_card?: unknown } } | undefined;
+      const body = input.body as
+        { card?: { save_card?: unknown }; vault_url?: unknown } | undefined;
       results = await payWithCard(
         target,
         apiKey,
         encodeURIComponent(id),
         card!,
         body?.card?.save_card === true,
+        typeof body?.vault_url === 'string' && body.vault_url
+          ? body.vault_url
+          : undefined,
       );
     } else if (action === 'pay-wallet') {
       results = await payWithWallet(

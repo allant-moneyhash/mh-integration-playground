@@ -252,6 +252,10 @@ export function ServerDrivenCheckout({
   );
   const ownCard = cardEntry === 'own';
   const cardFirst = settings.intentTiming === 'card-first';
+  /** Intent on Pay: the card form shows first; one Pay click creates the intent and pays. */
+  const payClick = settings.intentTiming === 'pay-click';
+  /** Both start with no intent: the card comes first. */
+  const beforeIntent = cardFirst || payClick;
   const [coupon, setCoupon] = useState<Coupon>(DEFAULT_COUPON);
   /** The card checked before the intent: raw (Direct, your form) or the SDK's cardData. */
   const [cf, setCf] = useState<{
@@ -285,7 +289,7 @@ export function ServerDrivenCheckout({
   // SDK card fields need the SDK ready when the card step opens (BIN lookup first: at once,
   // before any intent; the public key is enough to collect the card).
   useEffect(() => {
-    if (cardEntry !== 'sdk' || !(cardFirst || (cardStep && intent))) return;
+    if (cardEntry !== 'sdk' || !(beforeIntent || (cardStep && intent))) return;
     ensureSdk().catch(e => setError(errorText(e)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cardStep, cardEntry, intent]);
@@ -352,7 +356,7 @@ export function ServerDrivenCheckout({
   // "Continue to payment" was the go-ahead: the backend creates the intent now.
   useEffect(() => {
     // BIN lookup first: no intent until the card is checked (see the effect below).
-    if (started.current || cardFirst) return;
+    if (started.current || beforeIntent) return;
     started.current = true;
     run('create', async () => {
       const res = await serverIntentCall(session, api, 'create', {
@@ -492,10 +496,10 @@ export function ServerDrivenCheckout({
   }
 
   /** BIN lookup first: your server creates the intent for the final amount, then the same card pays it. */
-  function payCardFirst() {
-    if (!cf) return;
-    run('pay', async () => {
-      const { total } = couponTotal(base, cf.result);
+  function payCardFirst(c = cf) {
+    if (!c) return Promise.resolve();
+    return run('pay', async () => {
+      const { total } = couponTotal(base, c.result);
       const body: Obj = {
         ...intentBody,
         amount: total,
@@ -505,6 +509,10 @@ export function ServerDrivenCheckout({
       };
       // The basket lines no longer add up to a discounted amount.
       if (total !== base) delete body.product_items;
+      // Direct with your own form, intent on Pay: created with payment_method CARD, so the
+      // create response already carries the vault URL and update-method isn't needed.
+      const ownOnPay = payClick && !!c.raw;
+      if (ownOnPay) body.payment_method = 'CARD';
       const res = await serverIntentCall(session, api, 'create', { body });
       const i = obj(obj(res.data).intent);
       const id = str(i.id);
@@ -515,12 +523,16 @@ export function ServerDrivenCheckout({
       const secret = str(i.intent_secret);
       setIntent({ id, secret });
       setSelected('CARD');
-      if (cf.raw) {
-        // Direct, your own form: your server selects CARD and sends the same card to the vault.
+      if (c.raw) {
+        // Direct, your own form: the same card goes to the vault. Intent on Pay uses the vault
+        // URL from the create response; otherwise your server selects CARD to get one.
+        const vaultUrl = ownOnPay
+          ? str(obj(obj(obj(res.data).state_details).meta).url)
+          : undefined;
         await apply(
           await serverIntentCall(session, 'direct', 'pay-card', {
             intentId: id,
-            body: { card: cf.raw },
+            body: { card: c.raw, ...(vaultUrl ? { vault_url: vaultUrl } : {}) },
           }),
           id,
           'CARD',
@@ -537,8 +549,8 @@ export function ServerDrivenCheckout({
       applyIntentSecret(s, session, secret);
       const d = await s.cardForm.pay({
         intentId: id,
-        cardData: cf.cardData!,
-        ...(cf.saveCard !== undefined ? { saveCard: cf.saveCard } : {}),
+        cardData: c.cardData!,
+        ...(c.saveCard !== undefined ? { saveCard: c.saveCard } : {}),
       });
       const sd = d.stateDetails as {
         url?: string;
@@ -551,6 +563,73 @@ export function ServerDrivenCheckout({
         window.location.href = sd.url;
       else setSdkDetails(d);
     });
+  }
+
+  if (payClick && !intent) {
+    const currency = String(intentBody.amount_currency) as Currency;
+    const label = `Pay ${formatMoney(base, currency)}`;
+    return (
+      <div className="space-y-6">
+        <div>
+          <h3 className="font-medium text-bolder">Card</h3>
+          <p className="text-sm text-subtler">
+            {ownCard
+              ? 'No intent yet. On Pay your server creates it with payment_method CARD and sends this card straight to the vault URL from that response.'
+              : 'No intent yet. On Pay the card is collected, your server creates the intent and selects CARD, and the same card pays it.'}
+          </p>
+        </div>
+        {ownCard ? (
+          <div className="rounded-md border border-input p-4">
+            <OwnCardForm
+              payLabel={label}
+              offerSaveCard={!!customerId}
+              onPay={card =>
+                payCardFirst({
+                  last4: card.card_number.slice(-4),
+                  result: null,
+                  raw: card,
+                })
+              }
+            />
+          </div>
+        ) : sdk ? (
+          <div className="rounded-md border border-input">
+            <CardForm
+              key={layout}
+              sdk={sdk}
+              layout={layout}
+              payLabel={label}
+              offerSaveCard={!!customerId}
+              onPay={async ({ saveCard }) => {
+                noteNextCall(
+                  'cardForm.collect',
+                  'Customer clicked Pay: the card is collected now, before any intent exists.',
+                );
+                const cardData = await sdk.cardForm.collect();
+                await payCardFirst({
+                  last4: cardData.last_four_digits,
+                  result: null,
+                  cardData,
+                  saveCard,
+                });
+              }}
+            />
+          </div>
+        ) : (
+          <p className="flex items-center gap-2 text-sm text-subtle">
+            <Loader2 className="size-4 animate-spin" /> Loading the JS SDK card
+            fields…
+          </p>
+        )}
+        {busy && (
+          <p className="flex items-center gap-2 text-sm text-subtle">
+            <Loader2 className="size-4 animate-spin" /> Your server is creating
+            the intent…
+          </p>
+        )}
+        {error && <p className="text-sm text-destructive">{error}</p>}
+      </div>
+    );
   }
 
   if (cardFirst && !intent) {
@@ -664,7 +743,11 @@ export function ServerDrivenCheckout({
                 <span>{formatMoney(total, currency)}</span>
               </div>
             </div>
-            <Button className="w-full" disabled={!!busy} onClick={payCardFirst}>
+            <Button
+              className="w-full"
+              disabled={!!busy}
+              onClick={() => payCardFirst()}
+            >
               {busy && <Loader2 className="size-4 animate-spin" />}
               Pay {formatMoney(total, currency)}
             </Button>
@@ -809,7 +892,7 @@ export function ServerDrivenCheckout({
   }
 
   // BIN lookup first, after the intent: only the card's next steps (3DS, OTP…) remain.
-  if (cardFirst) {
+  if (beforeIntent) {
     return (
       <div className="space-y-4">
         {sdkPanel()}

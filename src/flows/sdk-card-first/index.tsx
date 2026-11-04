@@ -60,3 +60,44 @@ export const sdkCardFirstFlow: IntegrationFlow = {
   ],
   Checkout,
 };
+
+function PayClickCheckout(props: FlowCheckoutProps) {
+  return <CardFirstCheckout {...props} mode="pay-click" />;
+}
+
+/** The card form shows first; the intent is created only when the customer clicks Pay. */
+export const sdkPayClickFlow: IntegrationFlow = {
+  id: 'sdk-pay-click',
+  api: 'payment',
+  category: 'sdk',
+  label: 'Headless, intent on Pay',
+  summary:
+    'The card form is on the page from the start; your server creates the intent only when the customer clicks Pay, and the card collected at that moment pays it.',
+  ready: true,
+  usesEmbedUrl: false,
+  steps: session => [
+    {
+      source: 'Frontend SDK',
+      label: 'SDK card fields on the page with the public key (no intent yet)',
+    },
+    {
+      source: 'Frontend SDK',
+      label: 'Customer clicks Pay → cardForm.collect()',
+    },
+    {
+      source: 'Backend API',
+      label: 'POST /payments/intent/ with payment_method CARD',
+    },
+    {
+      source: 'Frontend SDK',
+      label: 'cardForm.pay({ intentId, cardData }); 3DS via renderUrl',
+      secret: sdkSecretNote(session),
+    },
+    {
+      source: 'Webhook',
+      label:
+        'MoneyHash posts webhooks to your backend; the order page shows the result',
+    },
+  ],
+  Checkout: PayClickCheckout,
+};

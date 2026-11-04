@@ -7,7 +7,7 @@ import { embedRedirectFlow } from './embed-redirect';
 import { sdkRenderFormFlow } from './sdk-render-form';
 import { sdkIntentFirstFlow } from './sdk-intent-first';
 import { sdkMethodsFirstFlow } from './sdk-methods-first';
-import { sdkCardFirstFlow } from './sdk-card-first';
+import { sdkCardFirstFlow, sdkPayClickFlow } from './sdk-card-first';
 import {
   mitFlow,
   serverCheckoutFlow,
@@ -25,7 +25,9 @@ function base(sel: Selection): IntegrationFlow {
         ? sdkIntentFirstFlow
         : settings.intentTiming === 'card-first'
           ? sdkCardFirstFlow
-          : sdkMethodsFirstFlow;
+          : settings.intentTiming === 'pay-click'
+            ? sdkPayClickFlow
+            : sdkMethodsFirstFlow;
     if (experience === 'form') return sdkRenderFormFlow;
     if (experience === 'hosted')
       return settings.hosted === 'iframe' ? embedIframeFlow : embedRedirectFlow;

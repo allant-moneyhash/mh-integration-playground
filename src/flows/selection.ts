@@ -9,7 +9,7 @@ export type Experience = 'checkout' | 'form' | 'hosted' | 'mit';
 
 export type CheckoutSettings = {
   /** Payment API only: create the intent when the customer picks a method, or up front. */
-  intentTiming: 'methods-first' | 'intent-first' | 'card-first';
+  intentTiming: 'methods-first' | 'intent-first' | 'pay-click' | 'card-first';
   /** Where the card number is typed. "own" is Direct API only; External needs MoneyHash's iframes. */
   cardEntry: 'sdk' | 'embed' | 'own';
   /** Apple Pay / Google Pay buttons: rendered by you (your server sends the receipt) or by the SDK flow. */
@@ -93,18 +93,18 @@ export const ALLOWED: Record<
   }
 > = {
   payment: {
-    intentTiming: ['methods-first', 'intent-first', 'card-first'],
+    intentTiming: ['methods-first', 'intent-first', 'pay-click', 'card-first'],
     cardEntry: ['sdk'],
     wallets: ['sdk'],
   },
   // Your server creates the intent on External / Direct: up front, or after the card check.
   external: {
-    intentTiming: ['intent-first', 'card-first'],
+    intentTiming: ['intent-first', 'pay-click', 'card-first'],
     cardEntry: ['sdk', 'embed'],
     wallets: ['own', 'sdk'],
   },
   direct: {
-    intentTiming: ['intent-first', 'card-first'],
+    intentTiming: ['intent-first', 'pay-click', 'card-first'],
     cardEntry: ['own', 'sdk', 'embed'],
     wallets: ['own', 'sdk'],
   },
@@ -116,7 +116,8 @@ export function cardEntriesFor(
   timing: CheckoutSettings['intentTiming'],
 ) {
   return ALLOWED[api].cardEntry.filter(
-    c => !(timing === 'card-first' && c === 'embed'),
+    c =>
+      !((timing === 'card-first' || timing === 'pay-click') && c === 'embed'),
   );
 }
 
@@ -124,6 +125,7 @@ export const SETTING_LABELS = {
   intentTiming: {
     'methods-first': 'Methods first',
     'intent-first': 'Intent first',
+    'pay-click': 'When the customer clicks Pay',
     'card-first': 'BIN lookup first',
   },
   cardEntry: {

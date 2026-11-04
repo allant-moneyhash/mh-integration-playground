@@ -26,9 +26,9 @@ import {
 
 const SETTING_HINTS = {
   intentTiming:
-    'Methods first: the intent is created when the customer picks a method. Intent first: up front. BIN lookup first: the card is collected before any intent, so the store can check a bank coupon against the card’s BIN (and optionally run BIN lookup or installments), then create the intent for the final amount.',
+    'Methods first: the intent is created when the customer picks a method. Intent first: up front. When the customer clicks Pay: the card form shows first and the intent is created only on Pay, then the same card pays it. BIN lookup first: the card is collected before any intent, so the store can check a bank coupon against the card’s BIN (and optionally run BIN lookup or installments), then create the intent for the final amount.',
   intentTimingServer:
-    'Intent first: your server creates the intent as the page opens. BIN lookup first: the card comes first (your own form on Direct, SDK card fields otherwise), your server checks a bank coupon against its BIN, then creates the intent for the final amount and pays with that same card.',
+    'Intent first: your server creates the intent as the page opens. When the customer clicks Pay: the card form shows first; on Pay your server creates the intent and pays with that card (Direct, your own form: created with payment_method CARD, then the card goes straight to the vault URL from that response). BIN lookup first: the card comes first (your own form on Direct, SDK card fields otherwise), your server checks a bank coupon against its BIN, then creates the intent for the final amount and pays with that same card.',
   threeDs:
     'In the page: the SDK shows the bank’s page here. Redirect: a full-page redirect.',
   hosted:

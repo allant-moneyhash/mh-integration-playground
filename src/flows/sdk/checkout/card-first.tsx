@@ -57,10 +57,14 @@ type Checked = {
 export function CardFirstCheckout({
   intentBody,
   session,
+  mode = 'coupon',
 }: {
   intentBody: IntentBody;
   session: Session;
+  /** coupon: check the card first (BIN lookup first). pay-click: one Pay click creates the intent and pays. */
+  mode?: 'coupon' | 'pay-click';
 }) {
+  const payClick = mode === 'pay-click';
   const router = useRouter();
   const cardLayout = useConfig(s => s.cardFormLayout);
   const customerId = useConfig(s => s.customerIds[accountKey(session)] ?? '');
@@ -141,14 +145,16 @@ export function CardFirstCheckout({
     if (!sdk) throw new Error('SDK not ready');
     setError(null);
     try {
-      const bin = await sdk
-        .binLookupByReceipt({
-          nativeReceiptData: receipt,
-          methodId,
-          ...(flowId ? { flowId } : {}),
-        })
-        .catch(() => null);
-      setWalletLookup({ method: methodId, bin });
+      const bin = payClick
+        ? null
+        : await sdk
+            .binLookupByReceipt({
+              nativeReceiptData: receipt,
+              methodId,
+              ...(flowId ? { flowId } : {}),
+            })
+            .catch(() => null);
+      if (!payClick) setWalletLookup({ method: methodId, bin });
       const res = await createPaymentIntent(session, bodyFor(base));
       applyIntentSecret(sdk, session, res.data.intent_secret);
       setIntentId(res.data.id);
@@ -215,14 +221,46 @@ export function CardFirstCheckout({
 
   /** Step 2: the server creates the intent for the final amount; the collected card pays it. */
   async function pay() {
-    if (!sdk || !checked) return;
+    if (!checked) return;
     setBusy(true);
     setError(null);
     try {
-      const res = await createPaymentIntent(session, bodyFor(total, 'CARD'));
+      await payWith(
+        checked.card,
+        checked.saveCard,
+        total,
+        checked.plans.find(p => p.id === planId),
+      );
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Intent on Pay: the click collects the card, your server creates the intent, the same card pays it. */
+  async function payOnClick({ saveCard }: { saveCard?: boolean }) {
+    if (!sdk) return;
+    setError(null);
+    noteNextCall(
+      'cardForm.collect',
+      'Customer clicked Pay: the card is collected now, before any intent exists.',
+    );
+    const card = await sdk.cardForm.collect();
+    await payWith(card, saveCard, base);
+  }
+
+  async function payWith(
+    card: CardData,
+    saveCard: boolean | undefined,
+    amount: number,
+    plan?: InstallmentPlan,
+  ) {
+    if (!sdk) return;
+    {
+      const res = await createPaymentIntent(session, bodyFor(amount, 'CARD'));
       applyIntentSecret(sdk, session, res.data.intent_secret);
       setIntentId(res.data.id);
-      const plan = checked.plans.find(p => p.id === planId);
       if (plan)
         noteNextCall(
           'cardForm.pay',
@@ -230,8 +268,8 @@ export function CardFirstCheckout({
         );
       const d = await sdk.cardForm.pay({
         intentId: res.data.id,
-        cardData: checked.card,
-        ...(customerId ? { saveCard: checked.saveCard } : {}),
+        cardData: card,
+        ...(customerId ? { saveCard } : {}),
         ...(plan
           ? {
               installmentPlanData: {
@@ -242,10 +280,6 @@ export function CardFirstCheckout({
           : {}),
       });
       setDetails(d);
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -279,6 +313,35 @@ export function CardFirstCheckout({
             onDetails={setDetails}
           />
         </div>
+      </div>
+    );
+  }
+
+  if (payClick) {
+    return (
+      <div className="space-y-6">
+        <ExpressCheckout
+          methods={wallets}
+          sdk={sdk}
+          live={session.env === 'production'}
+          onReceipt={onReceipt}
+        />
+        <div>
+          <h3 className="font-medium text-bolder">Card</h3>
+          <p className="text-sm text-subtler">
+            No intent yet: your server creates it when the customer clicks Pay.
+          </p>
+          <div className="mt-2 rounded-md border border-input">
+            <CardForm
+              sdk={sdk}
+              layout={cardLayout}
+              payLabel={`Pay ${formatMoney(base, currency)}`}
+              onPay={payOnClick}
+              offerSaveCard={!!customerId}
+            />
+          </div>
+        </div>
+        {error && <p className="text-sm text-destructive">{error}</p>}
       </div>
     );
   }
