@@ -50,7 +50,7 @@ export function resolveFlow(selection: Selection): IntegrationFlow {
   const key =
     sel.experience === 'checkout'
       ? sel.api === 'payment'
-        ? `${s.intentTiming}-${s.threeDs}-${s.methodsLookup}`
+        ? `${s.intentTiming}-${s.threeDs}-${s.methodsLookup}-${s.cardIntent}-${s.wallets}`
         : `${s.intentTiming}-${s.cardEntry}-${s.wallets}-${s.threeDs}`
       : sel.experience === 'hosted'
         ? s.hosted

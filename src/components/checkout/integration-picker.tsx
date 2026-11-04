@@ -14,6 +14,7 @@ import { useConfig } from '@/store/config';
 import {
   ALLOWED,
   cardEntriesFor,
+  walletsFor,
   EXPERIENCES,
   SETTING_LABELS,
   normalise,
@@ -107,6 +108,22 @@ export function IntegrationPicker({
                 : SETTING_HINTS.intentTimingServer
             }
           />
+          {api === 'payment' && settings.intentTiming === 'methods-first' && (
+            <PrefixedSelect
+              prefix="Card intent"
+              value={settings.cardIntent}
+              options={(['on-select', 'on-pay'] as const).map(v => ({
+                value: v,
+                label: SETTING_LABELS.cardIntent[v],
+              }))}
+              onChange={v => set({ cardIntent: v })}
+              hint={
+                settings.cardIntent === 'on-pay'
+                  ? 'Methods are listed first and the card form shows when Card is picked, with no intent yet. On Pay: cardForm.collect(), your server creates the intent without payment_method, then proceedWith({ type: "method", id: "CARD" }) and cardForm.pay().'
+                  : 'Picking Card makes your server create the intent with payment_method CARD; the card form then comes from the intent (getIntentDetails), and Pay calls cardForm.pay().'
+              }
+            />
+          )}
           {api === 'payment' && settings.intentTiming !== 'card-first' && (
             <PrefixedSelect
               prefix="getMethods for"
@@ -142,15 +159,19 @@ export function IntegrationPicker({
           <PrefixedSelect
             prefix="Wallet buttons"
             value={settings.wallets}
-            options={ALLOWED[api].wallets.map(v => ({
+            options={walletsFor(api, settings.intentTiming).map(v => ({
               value: v,
               label: SETTING_LABELS.wallets[v],
             }))}
             onChange={v => set({ wallets: v })}
             hint={
               api === 'payment'
-                ? 'With the Payment API, wallets go through the SDK.'
-                : 'Your own: Apple Pay / Google Pay buttons without the SDK; your server validates the Apple session and sends the receipt.'
+                ? settings.wallets === 'own'
+                  ? 'Your own buttons: cards stay on the Payment API. The Payment API has no server-side receipt endpoint, so the wallet tap makes your server create an External intent with the wallet as payment_method and post the receipt.'
+                  : 'Via SDK: the SDK’s wallet buttons, proceedWith + submitPaymentReceipt.'
+                : settings.intentTiming === 'pay-click'
+                  ? 'Your own: the wallet tap makes your server create the intent with the wallet as payment_method and post the receipt (no update-method). Via SDK: the intent is created, then proceedWith + submitPaymentReceipt.'
+                  : 'Your own: Apple Pay / Google Pay buttons without the SDK; your server validates the Apple session and sends the receipt.'
             }
           />
           <PrefixedSelect

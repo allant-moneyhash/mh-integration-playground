@@ -109,6 +109,10 @@ export function SdkCheckout({
   const cardLayout = useConfig(s => s.cardFormLayout);
   // "getMethods for": which of the Flow ID and customer this scenario sends (to getMethods and the intent).
   const lookup = useConfig(s => s.selection.settings.methodsLookup);
+  // Card intent on Pay (methods first): the card form shows with no intent; Pay creates it.
+  const cardOnPay =
+    useConfig(s => s.selection.settings.cardIntent === 'on-pay') &&
+    mode === 'methods-first';
   const sends = lookupSends(lookup);
   // A customer (from the Customer section) brings saved cards and "save this card".
   const storedCustomer = useConfig(
@@ -372,8 +376,39 @@ export function SdkCheckout({
     );
   }
 
+  /**
+   * Card intent on Pay: collect the card, your server creates the intent without a
+   * method, proceedWith selects CARD, and the same card pays it.
+   */
+  async function payCardOnPay({ saveCard }: { saveCard?: boolean }) {
+    if (!sdk) return;
+    noteNextCall(
+      'cardForm.collect',
+      'Customer clicked Pay: the card is collected now, before any intent exists.',
+    );
+    const cardData = await sdk.cardForm.collect();
+    const id = intentId ?? (await createIntent(sdk));
+    noteNextCall(
+      'proceedWith',
+      'The intent was created without payment_method, so the browser selects CARD on it now.',
+    );
+    await sdk.proceedWith({ intentId: id, type: 'method', id: 'CARD' });
+    const d = await sdk.cardForm.pay({
+      intentId: id,
+      cardData,
+      ...(customerId && saveCard !== undefined ? { saveCard } : {}),
+    });
+    redirectOr(d, setDetails);
+  }
+
   async function selectMethod(methodId: string) {
     if (!sdk || busy) return;
+    if (cardOnPay && methodId === 'CARD' && !intentId) {
+      // No call yet: the card form needs only the public key.
+      setSelected(methodId);
+      setDetails(null);
+      return;
+    }
     setSelected(methodId);
     setBusy(methodId);
     setError(null);
@@ -557,6 +592,24 @@ export function SdkCheckout({
                 )}
                 <span className="text-bolder">{m.title}</span>
               </label>
+              {cardOnPay &&
+                m.id === 'CARD' &&
+                selected === 'CARD' &&
+                !details && (
+                  <div className="border-t border-input">
+                    <p className="px-4 pt-3 text-xs text-subtle">
+                      No intent yet: your server creates it when the customer
+                      clicks Pay.
+                    </p>
+                    <CardForm
+                      sdk={sdk}
+                      layout={cardLayout}
+                      payLabel={`Pay ${amountLabel}`}
+                      onPay={payCardOnPay}
+                      offerSaveCard={!!customerId}
+                    />
+                  </div>
+                )}
               {selected === m.id && !busy && details && intentId && (
                 <StateRenderer
                   sdk={sdk}

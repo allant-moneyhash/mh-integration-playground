@@ -54,6 +54,7 @@ import type {
   Method,
   NativeReceiptData,
 } from '@moneyhash/js-sdk/headless';
+import { walletOnPay } from '../wallet-on-pay';
 import {
   CouponOutcome,
   CouponPanel,
@@ -285,6 +286,31 @@ export function ServerDrivenCheckout({
     });
     return sdkRef.current;
   }
+
+  // Intent on Pay: wallet buttons need each wallet's native config before any intent
+  // exists, so it is read once at account level with the public key.
+  useEffect(() => {
+    if (!payClick) return;
+    ensureSdk()
+      .then(s => {
+        noteNextCall(
+          'getMethods',
+          'Wallet setup: no intent exists yet, so the wallet buttons’ native config is read once at account level (public key).',
+        );
+        const flowId =
+          typeof intentBody.flow_id === 'string'
+            ? intentBody.flow_id
+            : undefined;
+        return s.getMethods({
+          currency: String(intentBody.amount_currency),
+          amount: Number(intentBody.amount),
+          ...(flowId ? { flowId } : { operation: 'purchase' as const }),
+        });
+      })
+      .then(m => setExpress(m.expressMethods ?? []))
+      .catch(() => setExpress([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [payClick]);
 
   // SDK card fields need the SDK ready when the card step opens (BIN lookup first: at once,
   // before any intent; the public key is enough to collect the card).
@@ -565,11 +591,80 @@ export function ServerDrivenCheckout({
     });
   }
 
+  /**
+   * Intent on Pay, wallet tapped: your own buttons → your server creates the intent with
+   * the wallet as payment_method and posts the receipt; via SDK → your server creates
+   * the intent, then proceedWith + submitPaymentReceipt.
+   */
+  async function payWalletOnPay(methodId: string, receipt: NativeReceiptData) {
+    setError(null);
+    setSelected(methodId);
+    try {
+      if (walletMode === 'own') {
+        const { id, secret, res } = await walletOnPay({
+          session,
+          api,
+          intentBody,
+          customerId,
+          methodId,
+          receipt,
+        });
+        setIntent({ id, secret });
+        await apply(res, id, methodId, secret);
+        return;
+      }
+      const created = await serverIntentCall(session, api, 'create', {
+        body: {
+          ...intentBody,
+          ...(customerId ? { customer: customerId } : {}),
+        },
+      });
+      const i = obj(obj(created.data).intent);
+      const id = str(i.id);
+      if (!id)
+        throw new Error(
+          'MoneyHash did not return an intent id. See the console.',
+        );
+      const secret = str(i.intent_secret);
+      setIntent({ id, secret });
+      const s = await ensureSdk(secret);
+      applyIntentSecret(s, session, secret);
+      await s.proceedWith({ intentId: id, type: 'method', id: methodId });
+      setSdkDetails(
+        await s.submitPaymentReceipt({
+          intentId: id,
+          nativeReceiptData: receipt,
+        }),
+      );
+    } catch (e) {
+      setError(errorText(e));
+      throw e;
+    }
+  }
+
   if (payClick && !intent) {
     const currency = String(intentBody.amount_currency) as Currency;
     const label = `Pay ${formatMoney(base, currency)}`;
     return (
       <div className="space-y-6">
+        {express.some(w => w.nativePayData) && (
+          <div className="space-y-2">
+            <ExpressCheckout
+              methods={express}
+              sdk={walletMode === 'sdk' ? (sdk ?? undefined) : undefined}
+              live={session.env === 'production'}
+              onReceipt={payWalletOnPay}
+              validateApplePay={
+                walletMode === 'own' ? validateApplePay : undefined
+              }
+            />
+            <p className="text-xs text-subtler">
+              {walletMode === 'own'
+                ? 'No intent yet. The wallet tap makes your server create the intent with the wallet as payment_method and post the receipt, with no update-method call.'
+                : 'No intent yet. The wallet tap makes your server create the intent; the SDK then calls proceedWith and submitPaymentReceipt.'}
+            </p>
+          </div>
+        )}
         <div>
           <h3 className="font-medium text-bolder">Card</h3>
           <p className="text-sm text-subtler">

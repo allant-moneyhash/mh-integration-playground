@@ -230,6 +230,8 @@ function readWallet(body: unknown) {
     method,
     receipt: body.receipt,
     ...(billing ? { receipt_billing_data: billing } : {}),
+    // The intent was created with this wallet as payment_method, so no update-method.
+    alreadySelected: body.already_selected === true,
   };
 }
 
@@ -240,6 +242,23 @@ async function payWithWallet(
   id: string,
   w: ReturnType<typeof readWallet>,
 ): Promise<CallResult[]> {
+  const paid = () =>
+    mhCall({
+      target,
+      apiKey,
+      method: 'POST',
+      path: `/${api}/payments/intents/${id}/receipt/`,
+      body: {
+        receipt: w.receipt,
+        ...(w.receipt_billing_data
+          ? { receipt_billing_data: w.receipt_billing_data }
+          : {}),
+      },
+      title: `${LABEL[api]}: submit wallet receipt`,
+    });
+  // Created with payment_method set to the wallet (as merchants do when the intent is
+  // created on the wallet tap): the receipt goes straight in.
+  if (w.alreadySelected) return [await paid()];
   const selected = await mhCall({
     target,
     apiKey,
@@ -249,20 +268,7 @@ async function payWithWallet(
     title: `${LABEL[api]}: select ${w.method}`,
   });
   if (!selected.ok) return [selected];
-  const paid = await mhCall({
-    target,
-    apiKey,
-    method: 'POST',
-    path: `/${api}/payments/intents/${id}/receipt/`,
-    body: {
-      receipt: w.receipt,
-      ...(w.receipt_billing_data
-        ? { receipt_billing_data: w.receipt_billing_data }
-        : {}),
-    },
-    title: `${LABEL[api]}: submit wallet receipt`,
-  });
-  return [selected, paid];
+  return [selected, await paid()];
 }
 
 /** Apple Pay merchant validation from your server (what the SDK's validateApplePayMerchantSession does). */

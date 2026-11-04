@@ -24,6 +24,12 @@ export type CheckoutSettings = {
    * then the same call with the customer after sign-in (methods first only).
    */
   methodsLookup: MethodsLookup;
+  /**
+   * Payment API, methods first: for Card, create the intent when Card is picked (with
+   * payment_method CARD), or only when the customer clicks Pay (no method; the SDK's
+   * proceedWith selects CARD, then cardForm.pay).
+   */
+  cardIntent: 'on-select' | 'on-pay';
 };
 
 export type MethodsLookup =
@@ -110,6 +116,20 @@ export const ALLOWED: Record<
   },
 };
 
+/**
+ * Wallet buttons for this timing. The Payment API has no server-side receipt endpoint, so
+ * "your own buttons" there means an External intent created on the wallet tap, which
+ * only fits when the intent is created on Pay.
+ */
+export function walletsFor(
+  api: BackendApi,
+  timing: CheckoutSettings['intentTiming'],
+): CheckoutSettings['wallets'][] {
+  if (api === 'payment')
+    return timing === 'pay-click' ? ['sdk', 'own'] : ['sdk'];
+  return ALLOWED[api].wallets;
+}
+
 /** Card entry that works with this timing: the embed needs an intent, so not before one exists. */
 export function cardEntriesFor(
   api: BackendApi,
@@ -136,6 +156,10 @@ export const SETTING_LABELS = {
   wallets: { own: 'Your own buttons', sdk: 'Via SDK' },
   threeDs: { page: 'In the page', redirect: 'Redirect' },
   hosted: { iframe: 'Iframe', redirect: 'Redirect' },
+  cardIntent: {
+    'on-select': 'When Card is picked',
+    'on-pay': 'When the customer clicks Pay',
+  },
   methodsLookup: {
     auto: 'Flow and customer (as set)',
     'flow-only': 'Flow, guest (no customer)',
@@ -152,6 +176,7 @@ export const DEFAULT_SETTINGS: CheckoutSettings = {
   threeDs: 'page',
   hosted: 'iframe',
   methodsLookup: 'auto',
+  cardIntent: 'on-select',
 };
 
 export const DEFAULT_SELECTION: Selection = {
@@ -172,15 +197,14 @@ export function normalise(sel: Selection): Selection {
     ? s.intentTiming
     : allowed.intentTiming[0];
   const cards = cardEntriesFor(sel.api, intentTiming);
+  const walletModes = walletsFor(sel.api, intentTiming);
   return {
     ...sel,
     settings: {
       ...s,
       intentTiming,
       cardEntry: cards.includes(s.cardEntry) ? s.cardEntry : cards[0],
-      wallets: allowed.wallets.includes(s.wallets)
-        ? s.wallets
-        : allowed.wallets[0],
+      wallets: walletModes.includes(s.wallets) ? s.wallets : walletModes[0],
     },
   };
 }

@@ -67,6 +67,15 @@ export function serverCheckoutFlow(
   ];
   // Intent on Pay: the card form is shown first; the Pay click creates the intent.
   const payClickSteps = (): FlowStep[] => [
+    wallets === 'own'
+      ? {
+          source: 'Backend API',
+          label: `Wallet tap: POST /${api}/payments/intent/ with payment_method APPLE_PAY / GOOGLE_PAY → POST …/intents/{id}/receipt/ (no update-method)`,
+        }
+      : {
+          source: 'Frontend SDK',
+          label: `Wallet tap: your server creates the intent → proceedWith + submitPaymentReceipt`,
+        },
     cardEntry === 'own'
       ? {
           source: 'Frontend',

@@ -41,6 +41,8 @@ import {
   type Sdk,
 } from '../runtime';
 import { CardForm, errorText } from './card-form';
+import { serverIntentCall } from '@/lib/api-client';
+import { walletNext, walletOnPay } from '../../wallet-on-pay';
 import { ExpressCheckout } from './express';
 import { checkoutIsDone, orderUrl, StateRenderer } from './sdk-checkout';
 
@@ -65,6 +67,9 @@ export function CardFirstCheckout({
   mode?: 'coupon' | 'pay-click';
 }) {
   const payClick = mode === 'pay-click';
+  /** Your own wallet buttons: the tap creates an External intent (no Payment API receipt endpoint). */
+  const ownWallets =
+    useConfig(s => s.selection.settings.wallets === 'own') && payClick;
   const router = useRouter();
   const cardLayout = useConfig(s => s.cardFormLayout);
   const customerId = useConfig(s => s.customerIds[accountKey(session)] ?? '');
@@ -317,15 +322,60 @@ export function CardFirstCheckout({
     );
   }
 
+  /** Own wallet button: your server creates an External intent with the wallet and posts the receipt. */
+  async function onOwnReceipt(methodId: string, receipt: NativeReceiptData) {
+    setError(null);
+    try {
+      const { id, res } = await walletOnPay({
+        session,
+        api: 'external',
+        intentBody,
+        customerId,
+        methodId,
+        receipt,
+      });
+      const next = walletNext(res);
+      if (next.state === 'URL_TO_RENDER' && next.url)
+        window.location.href = next.url;
+      else router.replace(orderUrl(id));
+    } catch (e) {
+      setError(errorText(e));
+      throw e;
+    }
+  }
+
+  async function validateOwnApplePay(methodId: string, validationUrl: string) {
+    const res = await serverIntentCall(
+      session,
+      'external',
+      'applepay-session',
+      {
+        body: { method_id: methodId, validation_url: validationUrl },
+      },
+    );
+    const data = (res.data ?? {}) as Record<string, unknown>;
+    const inner = data.data as Record<string, unknown> | undefined;
+    return inner && Object.keys(inner).length ? inner : data;
+  }
+
   if (payClick) {
     return (
       <div className="space-y-6">
         <ExpressCheckout
           methods={wallets}
-          sdk={sdk}
+          sdk={ownWallets ? undefined : sdk}
           live={session.env === 'production'}
-          onReceipt={onReceipt}
+          onReceipt={ownWallets ? onOwnReceipt : onReceipt}
+          validateApplePay={ownWallets ? validateOwnApplePay : undefined}
         />
+        {ownWallets && wallets.some(w => w.nativePayData) && (
+          <p className="text-xs text-subtler">
+            Your own wallet buttons: cards stay on the Payment API, but it has
+            no server-side receipt endpoint, so the tap makes your server create
+            an External intent with the wallet as payment_method and post the
+            receipt.
+          </p>
+        )}
         <div>
           <h3 className="font-medium text-bolder">Card</h3>
           <p className="text-sm text-subtler">
